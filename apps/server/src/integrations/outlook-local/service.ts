@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { AppContext } from '../../core/context';
 import { CalendarEvent, MailMessage } from '../../storage/internalSchemas';
 import { IS_WINDOWS, PS_READ_STDIN, runPowerShell } from '../../system/powershell';
-import { truncate } from '../../intelligence/text';
+import { findJoinUrl, truncate } from '../../intelligence/text';
 
 const SCRIPT = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'export.ps1'), 'utf8');
 
@@ -41,6 +41,7 @@ export interface RawEvent {
   meetingStatus: number;
   responseStatus: number;
   body: string;
+  joinUrl?: string | null;
 }
 
 export interface LocalOutlookStatus {
@@ -108,7 +109,7 @@ export function mapEvent(e: RawEvent, now = new Date().toISOString()): CalendarE
     // olMeetingCanceled = 5, olMeetingReceivedAndCanceled = 7
     isCancelled: e.meetingStatus === 5 || e.meetingStatus === 7,
     webLink: openLink(e.id),
-    onlineMeetingUrl: /https:\/\/teams\.microsoft\.com\/l\/meetup-join\/\S+/.exec(e.body ?? '')?.[0] ?? null,
+    onlineMeetingUrl: e.joinUrl || findJoinUrl(`${e.location ?? ''} ${e.body ?? ''}`),
     bodyPreview: e.body ?? '',
     syncedAt: now,
   });

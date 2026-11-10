@@ -4,8 +4,8 @@ import type { AppContext } from '../../core/context';
 import { CalendarEvent, MailMessage, PlannerTask } from '../../storage/internalSchemas';
 import { GRAPH_SCOPES, MsAuth, NotConnectedError } from './auth';
 import { GraphClient } from './graph';
-import { toLocalDateKey } from '../../intelligence/dates';
-import { truncate } from '../../intelligence/text';
+import { toLocalDateKey, brDate } from '../../intelligence/dates';
+import { findJoinUrl, truncate } from '../../intelligence/text';
 
 /* Tipos mínimos das respostas do Graph */
 interface GMessage {
@@ -330,7 +330,7 @@ export class MicrosoftService {
           showAs: e.showAs ?? null,
           isCancelled: e.isCancelled ?? false,
           webLink: e.webLink ?? null,
-          onlineMeetingUrl: e.onlineMeeting?.joinUrl ?? null,
+          onlineMeetingUrl: e.onlineMeeting?.joinUrl ?? findJoinUrl(`${e.location?.displayName ?? ''} ${e.bodyPreview ?? ''}`),
           bodyPreview: truncate(e.bodyPreview ?? '', 500),
           syncedAt: ts,
         }),
@@ -454,7 +454,7 @@ export class MicrosoftService {
           type: 'deadline',
           severity: 'warning',
           title: `Prazo alterado no Planner: ${truncate(p.title, 60)}`,
-          body: `${prev.dueDateTime ? toLocalDateKey(new Date(prev.dueDateTime)) : 'sem prazo'} → ${newDue ?? 'sem prazo'}${p.dueLocked ? ' (sua pauta mantém o prazo definido manualmente)' : ''}`,
+          body: `${prev.dueDateTime ? brDate(toLocalDateKey(new Date(prev.dueDateTime))) : 'sem prazo'} → ${newDue ? brDate(newDue) : 'sem prazo'}${p.dueLocked ? ' (sua pauta mantém o prazo definido manualmente)' : ''}`,
           link: `/pautas?id=${p.id}`,
           dedupeKey: `planner-due:${next.id}:${next.dueDateTime}`,
         });

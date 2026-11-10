@@ -14,7 +14,6 @@ import { SummaryService } from '../modules/summaries';
 import { MicrosoftService } from '../integrations/microsoft/service';
 import { Scheduler } from '../automation/scheduler';
 import { VersionService } from './version';
-import { DiscordService } from '../integrations/discord/bot';
 import { OutlookLocalService } from '../integrations/outlook-local/service';
 
 export interface AppContext {
@@ -33,7 +32,6 @@ export interface AppContext {
   ms: MicrosoftService;
   scheduler: Scheduler;
   version: VersionService;
-  discord: DiscordService;
   outlookLocal: OutlookLocalService;
   startedAt: Date;
 }
@@ -90,6 +88,5 @@ export async function createContext(env: Env, log: Logger, opts: ContextOptions 
   ctx.outlookLocal = new OutlookLocalService(ctx);
   ctx.ms = new MicrosoftService(ctx, { fetchImpl: opts.fetchImpl, sandbox: opts.sandbox, tokenProvider: opts.msTokenProvider });
   ctx.scheduler = new Scheduler(ctx);
-  ctx.discord = new DiscordService(ctx, env.discord);
   return ctx;
 }

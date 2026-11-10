@@ -63,7 +63,7 @@ const KPI_META: Record<string, KpiMeta> = {
   rate: { icon: <Gauge />, to: '/analytics', goodWhenUp: true },
 };
 
-const shortDate = (d: string) => format(parseISO(d), 'd MMM', { locale: ptBR }).replace('.', '');
+const shortDate = (d: string) => format(parseISO(d), 'dd/MM', { locale: ptBR });
 
 /* ------------------------------------------------------------------ */
 /* Página                                                              */
@@ -423,8 +423,9 @@ function DailySummaryCard({ summary }: { summary: Resumo | null }) {
                               <li key={idx}>
                                 <button
                                   type="button"
-                                  disabled={!it.pautaId}
-                                  onClick={() => it.pautaId && openPauta(it.pautaId)}
+                                  disabled={!it.pautaId && !it.url}
+                                  title={it.url ? 'Abrir' : undefined}
+                                  onClick={() => (it.pautaId ? openPauta(it.pautaId) : it.url && window.open(it.url, '_blank', 'noopener'))}
                                   className="flex w-full items-start gap-2 rounded-lg px-1.5 py-1 text-left text-[13px] text-fg enabled:hover:bg-sunken disabled:cursor-default"
                                 >
                                   <span className="mt-[7px] size-1 shrink-0 rounded-full bg-fg-3" />
@@ -593,7 +594,7 @@ function UpcomingEvents({ events }: { events: DashboardResponse['upcomingEvents'
                   )}
                 </div>
                 {e.url && (
-                  <a href={e.url} target="_blank" rel="noopener noreferrer" className="grid size-8 shrink-0 place-items-center self-center rounded-xl bg-accent-soft text-accent transition hover:brightness-110" title="Entrar / abrir no Outlook">
+                  <a href={e.url} target="_blank" rel="noopener noreferrer" className="grid size-8 shrink-0 place-items-center self-center rounded-xl bg-accent-soft text-accent transition hover:brightness-110" title={e.joinUrl ? "Entrar na reunião" : "Abrir no Outlook"}>
                     <Video className="size-4" />
                   </a>
                 )}

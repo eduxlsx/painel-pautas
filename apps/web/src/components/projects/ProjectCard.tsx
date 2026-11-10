@@ -150,7 +150,7 @@ export function ProjectCard({
 
       <div className="relative mt-auto flex flex-wrap items-center gap-1.5 pt-4">
         {due && (
-          <Tip content={`Prazo do projeto: ${fmtDate(p.dueDate, "d 'de' MMMM 'de' yyyy")}`}>
+          <Tip content={`Prazo do projeto: ${fmtDate(p.dueDate)}`}>
             <span>
               <Badge tone={due.tone === 'overdue' ? 'critical' : due.tone === 'today' ? 'high' : due.tone === 'soon' ? 'warning' : 'neutral'} icon={<CalendarClock />} className="capitalize">
                 {due.text}

@@ -26,7 +26,6 @@ export default defineConfig({
     url: `http://127.0.0.1:${port}/api/health`,
     reuseExistingServer: false,
     timeout: 60_000,
-    // Variáveis definidas aqui têm precedência sobre o .env: o bot do Discord nunca roda nos testes.
-    env: { PAUTAFLOW_HOME: home, PAUTAFLOW_PORT: String(port), PAUTAFLOW_LOG_LEVEL: 'warn', DISCORD_ENABLED: 'false', DISCORD_BOT_TOKEN: '' },
+    env: { PAUTAFLOW_HOME: home, PAUTAFLOW_PORT: String(port), PAUTAFLOW_LOG_LEVEL: 'warn' },
   },
 });

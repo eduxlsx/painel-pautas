@@ -131,13 +131,6 @@ export const IntegrationState = z.object({
       lastErrorAt: z.string().nullable().default(null),
     })
     .prefault({}),
-  discord: z
-    .object({
-      panelMessageId: z.string().nullable().default(null),
-      lastConnectedAt: z.string().nullable().default(null),
-      lastError: z.string().nullable().default(null),
-    })
-    .prefault({}),
 });
 export type IntegrationState = z.infer<typeof IntegrationState>;
 

@@ -112,6 +112,7 @@ foreach ($f in $folders) {
   } catch { $out.errors += ($f.name + ': ' + $_.Exception.Message) }
 }
 
+$joinPattern = 'https://(teams\.microsoft\.com/(l/meetup-join|meet)/|teams\.live\.com/meet/|[\w.-]*zoom\.us/(j|my|w)/|meet\.google\.com/|[\w.-]*webex\.com/(meet|join|[\w.-]+/j\.php))[^\s<>"]+'
 if ($p.calendar) {
   try {
     $cal = $ns.GetDefaultFolder(9).Items
@@ -122,7 +123,12 @@ if ($p.calendar) {
     $n = 0
     foreach ($a in $r) {
       $n++; if ($n -gt 1500) { break }
-      $prev = ''; try { $prev = [string]$a.Body } catch { }
+      $full = ''; try { $full = [string]$a.Body } catch { }
+      # Link de entrada: procura no convite inteiro e no campo Local (Teams, Zoom, Meet, Webex)
+      $join = $null
+      $jm = [regex]::Match(([string]$a.Location + ' ' + $full), $joinPattern)
+      if ($jm.Success) { $join = $jm.Value.TrimEnd('>', '"', ')', '.', ',') }
+      $prev = $full
       if ($prev.Length -gt 300) { $prev = $prev.Substring(0, 300) }
       $allDay = [bool]$a.AllDayEvent
       $out.events += [pscustomobject]@{
@@ -133,6 +139,7 @@ if ($p.calendar) {
         allDay = $allDay; location = [string]$a.Location; organizer = [string]$a.Organizer
         busy = [int]$a.BusyStatus; meetingStatus = [int]$a.MeetingStatus; responseStatus = [int]$a.ResponseStatus
         body = $prev
+        joinUrl = $join
       }
     }
   } catch { $out.errors += ('Calendário: ' + $_.Exception.Message) }

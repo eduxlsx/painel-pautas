@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { extractDeadline, addBusinessDays, toLocalDateKey } from '../src/intelligence/dates';
-import { cleanSubject, stripQuotedReply, titleSimilarity } from '../src/intelligence/text';
+import { extractDeadline, addBusinessDays, toLocalDateKey, brDate } from '../src/intelligence/dates';
+import { cleanSubject, findJoinUrl, stripQuotedReply, titleSimilarity } from '../src/intelligence/text';
 
 // Terça-feira, 10/11/2026, 09:00
 const ref = new Date(2026, 10, 10, 9, 0, 0);
@@ -38,6 +38,19 @@ describe('extractDeadline', () => {
 
   it('virada de ano: 05/01 em novembro é do próximo ano', () => {
     expect(extractDeadline('prazo 05/01', ref)?.date).toBe('2027-01-05');
+  });
+});
+
+describe('formato brasileiro e links de reunião', () => {
+  it('brDate', () => {
+    expect(brDate('2026-11-03')).toBe('03/11/2026');
+    expect(brDate('2026-11-03T14:30')).toBe('03/11/2026 às 14:30');
+    expect(brDate(null)).toBe('—');
+  });
+  it('findJoinUrl', () => {
+    expect(findJoinUrl('Entrar: <https://teams.microsoft.com/l/meetup-join/19%3ameeting_abc%40thread.v2/0?context=x> fim')).toMatch(/^https:\/\/teams\.microsoft\.com\/l\/meetup-join\/.+context=x$/);
+    expect(findJoinUrl('Zoom https://fs.zoom.us/j/123456789?pwd=abc.')).toBe('https://fs.zoom.us/j/123456789?pwd=abc');
+    expect(findJoinUrl('Sala 3 - presencial')).toBeNull();
   });
 });
 

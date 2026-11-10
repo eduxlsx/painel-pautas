@@ -5,6 +5,8 @@ import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
 import { CommandPalette } from '@/components/layout/CommandPalette';
+import { ErrorBoundary } from '@/components/layout/ErrorBoundary';
+import { MeetingAlerts } from '@/components/layout/MeetingAlerts';
 import { PautaDetailSheet } from '@/components/pauta/PautaDetailSheet';
 import { PautaEditorDialog } from '@/components/pauta/PautaEditorDialog';
 import { AssistantPanel } from '@/components/assistant/AssistantPanel';
@@ -73,6 +75,7 @@ function Shell() {
               transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
               className="mx-auto max-w-[1480px]"
             >
+              <ErrorBoundary resetKey={location.pathname} area={location.pathname}>
               <Suspense fallback={<PageFallback />}>
                 <Routes location={location}>
                   <Route path="/" element={<Dashboard />} />
@@ -90,14 +93,18 @@ function Shell() {
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Suspense>
+              </ErrorBoundary>
             </motion.div>
           </AnimatePresence>
         </main>
       </div>
-      <PautaDetailSheet />
+      <ErrorBoundary area="detalhes da pauta">
+        <PautaDetailSheet />
+      </ErrorBoundary>
       <PautaEditorDialog />
       <AssistantPanel />
       <CommandPalette />
+      <MeetingAlerts />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import type { Categoria, DuplicateHint, Pauta, PautaKind, PriorityLevel, Projeto, SourceRef, Sugestao } from '@pautaflow/shared';
 import { isOpenStatus } from '@pautaflow/shared';
 import type { MailMessage, PlannerTask } from '../storage/internalSchemas';
-import { daysBetween, dueToDate, extractDeadline, toLocalDateKey } from './dates';
+import { daysBetween, dueToDate, extractDeadline, toLocalDateKey, brDate } from './dates';
 import { cleanSubject, norm, sentences, stripQuotedReply, titleSimilarity, truncate } from './text';
 
 export interface DemandCandidate {
@@ -35,7 +35,9 @@ export interface RadarContext {
 const NOISE_SENDER = /(no-?reply|noreply|nao-?responda|newsletter|mailer-daemon|postmaster|notifications?@|notificacao|marketing@|news@|bounce)/i;
 const NOISE_TEXT = /(descadastr|unsubscribe|cancelar (a )?inscri|voce esta recebendo este e-?mail|this email was sent to|ver no navegador|view in browser)/;
 const REQUEST = /\b(pode(ria|m|riam)?|consegue(m)?|conseguiria(m)?|preciso que|precisamos que|precisamos de|preciso de|necessito|solicit(o|amos|amos que)|pe(c|ç)o|pedimos|por gentileza|gentileza|por favor|favor (enviar|verificar|revisar|analisar|aprovar|providenciar|encaminhar|retornar|confirmar|incluir|ajustar|atualizar)|aguardo|fico no aguardo|ficamos no aguardo|me (envia|manda|passa|ajuda)|voce (pode|consegue)|teria como|seria possivel|e possivel|conto com|providenciar|demanda|solicitacao)\b/;
-const APPROVAL = /\b(aprova(r|cao|do|da)|de acordo|validar|validacao|ok para (publicar|seguir|envio)|autoriza(r|cao)|parecer|sign-?off)\b/;
+/** Avisos automáticos de status (chamados encerrados, confirmações, respostas automáticas) não são demandas. */
+const STATUS_NOTICE = /\b(foi (encerrad|resolvid|conclu|fechad|cancelad|aprovad|recebid)|was (closed|resolved|completed|approved)|chamado (encerrado|resolvido)|ticket (closed|resolved)|confirmacao de (recebimento|leitura)|read receipt|resposta automatica|automatic reply|fora do escritorio|out of office)/;
+const APPROVAL = /\b(aprova(r|cao|do|da)|de acordo(?! com)|validar|validacao|ok para (publicar|seguir|envio)|autoriza(r|cao)|parecer|sign-?off)\b/;
 const URGENT = /\b(urgente|urgencia|prioridade|asap|o quanto antes|com urgencia|imediato|imediatamente|critico|importante)\b/;
 const COMMITMENT = /\b(vou (enviar|verificar|providenciar|encaminhar|preparar|revisar|ajustar|mandar)|te envio|envio ate|fico de|retorno (ate|amanha|hoje|em)|me comprometo|vou te retornar|ate (amanha|sexta|segunda) (te )?envio)\b/;
 const PUBLICATION = /\b(publicacao|publicar|post|postagem|release|materia|artigo|newsletter|veicula(r|cao))\b/;
@@ -71,6 +73,8 @@ export function analyzePlannerEmail(msg: MailMessage, ctx: RadarContext): Demand
   const body = msg.bodyText || msg.bodyPreview;
   const text = `${msg.subject}\n${body}`;
   if (!PLANNER_ASSIGN.test(norm(text))) return null; // comentários e outros avisos do Planner
+  // Resumos ("Você tem tarefas atrasadas", "tarefas vencendo") não identificam uma tarefa única
+  if (/(tarefas? (atrasad|vencend|vence)|voce tem \d* ?tarefas|late tasks|tasks? (due|overdue)|you have \d* ?tasks)/.test(norm(msg.subject))) return null;
   const quoted = /["“”«]([^"“”»\n]{3,160})["“”»]/.exec(msg.subject) ?? /["“”«]([^"“”»\n]{3,160})["“”»]/.exec(body);
   const afterColon = /(?:tarefa|task)\s*:\s*(.{3,160})$/im.exec(msg.subject);
   const title = (quoted?.[1] ?? afterColon?.[1] ?? cleanSubject(msg.subject)).trim();
@@ -124,6 +128,7 @@ export function analyzeMail(msg: MailMessage, ctx: RadarContext): DemandCandidat
   const full = `${msg.subject}\n${body}`;
   const nfull = norm(full);
   if (NOISE_TEXT.test(nfull)) return null;
+  if (!msg.isSent && STATUS_NOTICE.test(norm(msg.subject))) return null;
 
   const sents = sentences(body);
   const signals: string[] = [];
@@ -131,7 +136,14 @@ export function analyzeMail(msg: MailMessage, ctx: RadarContext): DemandCandidat
   const ref = new Date(msg.receivedAt);
   const deadline = extractDeadline(full, ref);
   const urgent = URGENT.test(nfull) || msg.importance === 'high';
-  const approval = APPROVAL.test(nfull);
+  const toMe = msg.to.some((t) => ctx.myEmails.includes(t.toLowerCase()));
+  const ccOnly = !toMe && msg.cc.some((t) => ctx.myEmails.includes(t.toLowerCase()));
+  // Pedido de aprovação: termo no assunto ou numa frase de solicitação — e você não está apenas em cópia
+  const approval =
+    !ccOnly &&
+    (APPROVAL.test(norm(msg.subject)) ||
+      /\b(para (sua |a sua )?(aprovacao|validacao)|aguardo (sua |o seu |seu )?(ok|aprovacao|de acordo|validacao))\b/.test(nfull) ||
+      sents.some((x) => APPROVAL.test(norm(x)) && REQUEST.test(norm(x))));
   let kind: PautaKind = 'tarefa';
   let evidenceSents: string[] = [];
 
@@ -160,15 +172,13 @@ export function analyzeMail(msg: MailMessage, ctx: RadarContext): DemandCandidat
       score += 0.2;
       kind = 'aprovacao';
     }
-    const toMe = msg.to.some((t) => ctx.myEmails.includes(t.toLowerCase()));
-    const ccOnly = !toMe && msg.cc.some((t) => ctx.myEmails.includes(t.toLowerCase()));
     if (toMe && msg.to.length <= 3) {
       signals.push('Enviado diretamente a você');
       score += 0.08;
     }
     if (ccOnly) {
       signals.push('Você está apenas em cópia');
-      score -= 0.15;
+      score -= msg.flagged ? 0.05 : 0.25;
     }
     if (msg.inferenceClassification === 'other') {
       signals.push('Classificado como "Outros" pelo Outlook');
@@ -236,7 +246,7 @@ export function analyzePlannerTask(task: PlannerTask, ctx: RadarContext): Demand
   const project = ctx.projects.find((p) => norm(p.name) === norm(task.planTitle)) ?? guessByKeywords(text, ctx.projects.filter((p) => p.status === 'active'));
   const category = guessByKeywords(text, ctx.categories);
   const signals = ['Tarefa atribuída a você no Planner', `Plano: ${task.planTitle || task.planId}`];
-  if (dueDate) signals.push(`Prazo no Planner (${dueDate})`);
+  if (dueDate) signals.push(`Prazo no Planner (${brDate(dueDate)})`);
   if (task.percentComplete > 0) signals.push(`Em andamento (${task.percentComplete}%)`);
   return {
     title: truncate(task.title, 140),

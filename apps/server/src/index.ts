@@ -14,7 +14,6 @@ async function main() {
   const app = await buildApp(ctx);
   await app.listen({ port: env.port, host: env.host });
   await ctx.scheduler.start();
-  void ctx.discord.start();
   const v = await ctx.version.info();
   log.info(`PautaFlow Intelligence v${v.version} disponível em http://${env.host === '0.0.0.0' ? 'localhost' : env.host}:${env.port}`);
 
@@ -24,7 +23,6 @@ async function main() {
     shuttingDown = true;
     log.info({ signal }, 'Encerrando com segurança…');
     ctx.scheduler.stop();
-    await ctx.discord.stop().catch(() => undefined);
     try {
       await app.close();
       await ctx.db.flushAll();

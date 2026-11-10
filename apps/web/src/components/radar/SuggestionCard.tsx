@@ -149,7 +149,7 @@ export function SuggestionCard({ s, handlers, busy }: { s: Sugestao; handlers: S
           {s.dueDateEvidence && (
             <p className="mt-1.5 flex items-center gap-1 text-[11.5px] text-fg-3">
               <CalendarClock className="size-3" />
-              Prazo {s.dueDate ? fmtDate(s.dueDate, "d 'de' MMMM") : ''} inferido de “{s.dueDateEvidence}”
+              Prazo {s.dueDate ? fmtDate(s.dueDate) : ''} inferido de “{s.dueDateEvidence}”
             </p>
           )}
 

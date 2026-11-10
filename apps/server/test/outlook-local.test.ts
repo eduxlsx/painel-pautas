@@ -64,5 +64,27 @@ describe('Radar — notificações do Planner por e-mail', () => {
   });
   it('outras notificações do Planner são ignoradas', () => {
     expect(analyzeMail(mail({ subject: 'Novo comentário na tarefa', bodyText: 'João comentou na tarefa.' }), ctx)).toBeNull();
+    expect(analyzeMail(mail({ subject: 'Você tem tarefas atrasadas', bodyText: 'Tarefas atribuídas a você no plano Comunicação estão atrasadas.' }), ctx)).toBeNull();
+  });
+});
+
+describe('Radar — falsos positivos observados em e-mails reais', () => {
+  const ctx: RadarContext = { now, myEmails: ['eu@empresa.com'], categories: [], projects: [], ignoreSenders: [] };
+  const mail = (o: Partial<MailMessage>) =>
+    MailMessage.parse({ id: 'x', folderId: 'inbox', fromName: 'Ana', fromEmail: 'ana@empresa.com', to: ['eu@empresa.com'], receivedAt: now.toISOString(), syncedAt: now.toISOString(), ...o });
+
+  it('chamado encerrado não é demanda', () => {
+    expect(analyzeMail(mail({ subject: 'A solicitação RITM5039404 foi encerrada', bodyText: 'Por favor avalie o atendimento.' }), ctx)).toBeNull();
+  });
+  it('"de acordo com" não é pedido de aprovação', () => {
+    const c = analyzeMail(mail({ subject: 'Levantamento', bodyText: 'Pode enviar o levantamento até sexta, de acordo com o modelo?' }), ctx)!;
+    expect(c.kind).not.toBe('aprovacao');
+  });
+  it('em cópia: não vira aprovação e perde confiança', () => {
+    const c = analyzeMail(mail({ to: ['outro@empresa.com'], cc: ['eu@empresa.com'], subject: 'Comunicado para aprovação', bodyText: 'Pode aprovar o comunicado?' }), ctx);
+    expect(c === null || (c.kind !== 'aprovacao' && c.confidence < 0.45)).toBe(true);
+  });
+  it('aprovação direta continua reconhecida', () => {
+    expect(analyzeMail(mail({ subject: 'Arte da campanha', bodyText: 'Você pode aprovar a arte até amanhã?' }), ctx)!.kind).toBe('aprovacao');
   });
 });

@@ -12,7 +12,7 @@ export const effectivePriority = (p: Pauta): PriorityLevel => p.manualPriority ?
 
 export const PRIORITY_LEVELS: PriorityLevel[] = ['critical', 'high', 'medium', 'low'];
 
-/** Data (YYYY-MM-DD) de um campo ISO/data para inputs type="date". */
+/** Data (YYYY-MM-DD) de um campo ISO/data para inputs type="date" max="2100-12-31". */
 export const dateInput = (iso: string | null | undefined): string => (iso ? iso.slice(0, 10) : '');
 
 export function daysUntil(due: string | null | undefined): number | null {

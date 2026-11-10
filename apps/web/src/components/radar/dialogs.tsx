@@ -6,7 +6,7 @@ import type { Pauta, PautaKind, PriorityLevel, Sugestao } from '@pautaflow/share
 import { isOpenStatus, KIND_LABEL, PRIORITY_LABEL } from '@pautaflow/shared';
 import { cn } from '@/lib/utils';
 import { patch, useApiMutation, usePautas } from '@/lib/queries';
-import { Button, Dialog, DueChip, EmptyState, Field, Input, NativeSelect, PriorityBadge, Skeleton, StatusBadge, Textarea } from '@/components/ui';
+import { Button, DateInput, DueInput, Dialog, DueChip, EmptyState, Field, Input, NativeSelect, PriorityBadge, Skeleton, StatusBadge, Textarea } from '@/components/ui';
 import { useLookups } from '@/components/pauta/PautaCard';
 
 const PRIORITIES: PriorityLevel[] = ['critical', 'high', 'medium', 'low'];
@@ -88,7 +88,7 @@ function ApproveForm({ s, onCancel, onConfirm, loading }: { s: Sugestao; onCance
       </Field>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Prazo" hint={s.dueDateEvidence ? `Detectado: “${s.dueDateEvidence}”` : undefined}>
-          <Input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+          <DueInput value={due} onValueChange={(v) => setDue(v ?? "")} />
         </Field>
         <Field label="Prioridade">
           <NativeSelect value={priority} onChange={(e) => setPriority(e.target.value as PriorityLevel)}>
@@ -172,7 +172,7 @@ function EditForm({ s, onDone }: { s: Sugestao; onDone: () => void }) {
       </Field>
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Prazo">
-          <Input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+          <DueInput value={due} onValueChange={(v) => setDue(v ?? "")} />
         </Field>
         <Field label="Prioridade sugerida">
           <NativeSelect value={priority} onChange={(e) => setPriority(e.target.value as PriorityLevel)}>

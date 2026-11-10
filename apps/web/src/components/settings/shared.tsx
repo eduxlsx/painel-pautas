@@ -1,7 +1,7 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Plus, RotateCcw, Save, X } from 'lucide-react';
-import { Button, GlassCard, Input } from '@/components/ui';
+import { Button, GlassCard, Input , TimeField } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
 /* ------------------------------------------------------------------ */
@@ -171,7 +171,7 @@ export function NumberInput({ value, onChange, min, max, step = 1, suffix, class
 }
 
 export function TimeInput({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
-  return <Input type="time" value={value} onChange={(e) => e.target.value && onChange(e.target.value)} className={cn('tabular', className)} />;
+  return <TimeField value={value} onValueChange={(v) => v && onChange(v)} className={className} />;
 }
 
 /** Controle deslizante 0–1 exibido em porcentagem. */

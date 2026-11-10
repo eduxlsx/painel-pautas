@@ -358,12 +358,13 @@ const NOTIF_TYPES: { key: string; label: string; hint: string }[] = [
   { key: 'integration_error', label: 'Erros de integração', hint: 'Falhas de sincronização com o Microsoft 365.' },
   { key: 'sync', label: 'Sincronizações', hint: 'Resumo de itens novos após sincronizar.' },
   { key: 'forgotten', label: 'Pautas esquecidas', hint: 'Pautas abertas sem atividade há dias.' },
+  { key: 'meeting', label: 'Reuniões', hint: 'Aviso antes de cada reunião, com o link para entrar.' },
   { key: 'system', label: 'Sistema', hint: 'Backups, atualizações e avisos gerais.' },
 ];
 
 export function NotificacoesSection({ id, config }: { id: string; config: Cfg }) {
   const n = config.notifications;
-  const draft = useDraft({ inApp: n.inApp, quietHoursStart: n.quietHoursStart, quietHoursEnd: n.quietHoursEnd, deadlineWarningHours: n.deadlineWarningHours, maxNativePerHour: n.maxNativePerHour, types: n.types });
+  const draft = useDraft({ inApp: n.inApp, quietHoursStart: n.quietHoursStart, quietHoursEnd: n.quietHoursEnd, deadlineWarningHours: n.deadlineWarningHours, meetingReminderMinutes: n.meetingReminderMinutes, maxNativePerHour: n.maxNativePerHour, types: n.types });
   const save = useSaveConfig();
   const d = draft.value;
   return (
@@ -398,6 +399,9 @@ export function NotificacoesSection({ id, config }: { id: string; config: Cfg })
         </SettingRow>
         <SettingRow title="Antecedência de prazo">
           <NumberInput value={d.deadlineWarningHours} onChange={(v) => draft.set('deadlineWarningHours', Math.round(v))} min={1} max={168} suffix="horas" className="w-32" />
+        </SettingRow>
+        <SettingRow title="Aviso de reunião" description="Minutos antes do início (0 desliga). Aparece na tela, no sino e no Windows.">
+          <NumberInput value={d.meetingReminderMinutes} onChange={(v) => draft.set('meetingReminderMinutes', Math.round(v))} min={0} max={120} suffix="min" className="w-32" />
         </SettingRow>
         <SettingRow title="Máximo de alertas do Windows" description="Evita interrupções em excesso.">
           <NumberInput value={d.maxNativePerHour} onChange={(v) => draft.set('maxNativePerHour', Math.round(v))} min={1} max={60} suffix="/hora" className="w-32" />

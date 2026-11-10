@@ -57,7 +57,16 @@ export async function buildApp(ctx: AppContext, opts: { serveWeb?: boolean } = {
   registerApi(app, ctx);
 
   if (opts.serveWeb !== false && (await fileExists(path.join(ctx.env.webDist, 'index.html')))) {
-    await app.register(fastifyStatic, { root: ctx.env.webDist, prefix: '/', wildcard: false, maxAge: '1h' });
+    await app.register(fastifyStatic, {
+      root: ctx.env.webDist,
+      prefix: '/',
+      wildcard: false,
+      cacheControl: false,
+      // index.html nunca em cache (para atualizações aparecerem na hora); arquivos com hash ficam em cache longo
+      setHeaders: (res, filePath) => {
+        res.header('cache-control', /[\\/]assets[\\/]/.test(filePath) ? 'public, max-age=31536000, immutable' : 'no-cache');
+      },
+    });
     // SPA: rotas desconhecidas (fora de /api) retornam o index.html
     app.setNotFoundHandler((req, reply) => {
       if (req.url.startsWith('/api/')) return reply.code(404).send({ error: 'Rota não encontrada' });

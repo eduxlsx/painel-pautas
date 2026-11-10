@@ -5,6 +5,31 @@ import { z } from 'zod';
 /* ------------------------------------------------------------------ */
 
 export const IsoDate = z.string().min(10); // ISO 8601 (data ou data/hora)
+
+/**
+ * Normaliza uma data de calendário (prazo/início). Aceita YYYY-MM-DD ou ISO completo.
+ * Repara anos digitados com dígitos a mais no seletor do navegador (ex.: "262026-11-03" → "2026-11-03")
+ * e descarta valores impossíveis em vez de quebrar a aplicação.
+ */
+export function sanitizeCalendarDate(v: unknown): string | null {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  const m = /^(\d{4,6})-(\d{2})-(\d{2})(T.*)?$/.exec(s);
+  if (!m) return null;
+  let year = m[1]!;
+  if (year.length > 4) year = year.slice(-4);
+  const y = Number(year);
+  if (y < 1990 || y > 2200) return null;
+  const out = `${year}-${m[2]}-${m[3]}${m[4] ?? ''}`;
+  const d = new Date(m[4] ? out : `${out}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  if (!m[4] && (d.getMonth() + 1 !== Number(m[2]) || d.getDate() !== Number(m[3]))) return null; // 31/02 etc.
+  return out;
+}
+
+/** Data de calendário opcional: validada e reparada na entrada e na leitura dos arquivos. */
+export const CalendarDate = z.preprocess(sanitizeCalendarDate, z.string().nullable()).default(null);
 export const Id = z.string().min(1);
 
 export const PautaStatus = z.enum(['backlog', 'todo', 'in_progress', 'waiting', 'review', 'done', 'cancelled']);
@@ -28,7 +53,7 @@ export const Subtask = z.object({
   id: Id,
   title: z.string(),
   done: z.boolean().default(false),
-  dueDate: IsoDate.nullable().default(null),
+  dueDate: CalendarDate,
 });
 export const Comment = z.object({ id: Id, text: z.string(), createdAt: IsoDate, author: z.string().default('Você') });
 export const LinkRef = z.object({ id: Id, label: z.string(), url: z.string() });
@@ -83,8 +108,8 @@ export const Pauta = z.object({
   priorityComputedAt: IsoDate.nullable().default(null),
   createdAt: IsoDate,
   updatedAt: IsoDate,
-  startDate: IsoDate.nullable().default(null),
-  dueDate: IsoDate.nullable().default(null),
+  startDate: CalendarDate,
+  dueDate: CalendarDate,
   /** Quando true, sincronizações não alteram o prazo (o usuário definiu manualmente). */
   dueLocked: z.boolean().default(false),
   completedAt: IsoDate.nullable().default(null),
@@ -140,7 +165,7 @@ export const Projeto = z.object({
   color: z.string().default('#6366f1'),
   status: z.enum(['active', 'paused', 'done']).default('active'),
   owner: z.string().nullable().default(null),
-  dueDate: IsoDate.nullable().default(null),
+  dueDate: CalendarDate,
   /** Palavras-chave usadas pelo radar para associar demandas ao projeto. */
   keywords: z.array(z.string()).default([]),
   createdAt: IsoDate,
@@ -195,7 +220,7 @@ export const Sugestao = z.object({
   sourceUrl: z.string().nullable().default(null),
   requester: z.string().nullable().default(null),
   requesterEmail: z.string().nullable().default(null),
-  dueDate: IsoDate.nullable().default(null),
+  dueDate: CalendarDate,
   dueDateEvidence: z.string().nullable().default(null),
   suggestedPriority: PriorityLevel.default('medium'),
   kind: PautaKind.default('tarefa'),
@@ -233,6 +258,7 @@ export const NotificationType = z.enum([
   'sync',
   'forgotten',
   'system',
+  'meeting',
 ]);
 export type NotificationType = z.infer<typeof NotificationType>;
 
@@ -274,6 +300,8 @@ export const SummarySection = z.object({
       text: z.string(),
       pautaId: z.string().nullable().default(null),
       meta: z.string().nullable().default(null),
+      /** Link do item (e-mail no Outlook, entrada da reunião). */
+      url: z.string().nullable().default(null),
     }),
   ),
 });
@@ -383,6 +411,8 @@ export const Configuracoes = z.object({
       quietHoursStart: z.string().default('20:00'),
       quietHoursEnd: z.string().default('07:30'),
       deadlineWarningHours: z.number().int().min(1).max(168).default(24),
+      /** Minutos de antecedência do aviso de reunião (0 = desligado). */
+      meetingReminderMinutes: z.number().int().min(0).max(120).default(10),
       maxNativePerHour: z.number().int().min(1).max(60).default(6),
       types: z.record(z.string(), z.boolean()).default({}),
     })

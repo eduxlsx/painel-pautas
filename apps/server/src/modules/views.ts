@@ -12,7 +12,7 @@ import {
   STATUS_ORDER,
 } from '@pautaflow/shared';
 import type { AppContext } from '../core/context';
-import { addDays, daysBetween, dueToDate, startOfDay, startOfWeek, toLocalDateKey } from '../intelligence/dates';
+import { addDays, daysBetween, dueToDate, startOfDay, startOfWeek, toLocalDateKey, brDate } from '../intelligence/dates';
 import { effectiveOrder, recommendedOrder, remainingHours } from '../intelligence/priority';
 import { attentionList, buildInsights, nextActionFor } from '../intelligence/insights';
 import { computeAnalytics, isOverdue, resolvePeriod } from '../analytics/metrics';
@@ -60,6 +60,8 @@ export function calendarItems(app: AppContext, from: Date, to: Date): CalendarIt
       pautaId: null,
       location: e.location,
       url: e.onlineMeetingUrl ?? e.webLink,
+      joinUrl: e.onlineMeetingUrl,
+      openUrl: e.webLink,
       color: '#0ea5e9',
       editable: false,
     });
@@ -184,6 +186,8 @@ export async function dashboard(app: AppContext): Promise<DashboardResponse> {
       pautaId: null,
       location: e.location,
       url: e.onlineMeetingUrl ?? e.webLink,
+      joinUrl: e.onlineMeetingUrl,
+      openUrl: e.webLink,
       editable: false,
     }));
 
@@ -192,7 +196,11 @@ export async function dashboard(app: AppContext): Promise<DashboardResponse> {
     kpis,
     attention: attentionList(pautas, now),
     insights: buildInsights(pautas, sugs, now, cfg.workday.dailyCapacityHours, cfg.workday.days),
-    dailySummary: await app.summaries.latest('daily'),
+    dailySummary: await (async () => {
+      // Garante o resumo de hoje ao abrir o painel (ex.: computador ligado depois do horário programado)
+      const last = await app.summaries.latest('daily');
+      return last && last.periodStart === today ? last : app.summaries.generate('daily').catch(() => last);
+    })(),
     charts: {
       byCategory: [...byCat.entries()].map(([id, value]) => ({ key: id, label: catMap.get(id)?.name ?? 'Sem categoria', value, color: catMap.get(id)?.color ?? '#94a3b8' })).sort((a, b) => b.value - a.value),
       byStatus: STATUS_ORDER.filter((s) => s !== 'done').map((s) => ({ key: s, label: STATUS_LABEL[s], value: open.filter((p) => p.status === s).length })),
@@ -220,7 +228,7 @@ const INTENTS: Intent[] = [
   { key: 'planner', test: /(planner|tarefa)/ },
 ];
 
-const pautaRef = (p: Pauta, meta?: string) => ({ type: 'pauta' as const, id: p.id, title: p.title, meta: meta ?? (p.dueDate ? `prazo ${p.dueDate}` : STATUS_LABEL[p.status]) });
+const pautaRef = (p: Pauta, meta?: string) => ({ type: 'pauta' as const, id: p.id, title: p.title, meta: meta ?? (p.dueDate ? `prazo ${brDate(p.dueDate)}` : STATUS_LABEL[p.status]) });
 
 export async function askAssistant(app: AppContext, question: string): Promise<AssistantAnswer> {
   const { db } = app;
@@ -243,7 +251,7 @@ export async function askAssistant(app: AppContext, question: string): Promise<A
     }
     case 'overdue': {
       const list = open.filter((p) => isOverdue(p, now));
-      answer = list.length ? `Sim, ${list.length} pauta(s) atrasada(s):\n${list.map((p) => `• ${p.title} (prazo ${p.dueDate}, ${-daysBetween(now, dueToDate(p.dueDate!))} dia(s) de atraso)`).join('\n')}` : 'Nenhuma entrega atrasada. 👏';
+      answer = list.length ? `Sim, ${list.length} pauta(s) atrasada(s):\n${list.map((p) => `• ${p.title} (prazo ${brDate(p.dueDate)}, ${-daysBetween(now, dueToDate(p.dueDate!))} dia(s) de atraso)`).join('\n')}` : 'Nenhuma entrega atrasada. 👏';
       items = list.map((p) => pautaRef(p));
       break;
     }
@@ -300,7 +308,7 @@ export async function askAssistant(app: AppContext, question: string): Promise<A
     }
     case 'planner': {
       const tasks = db.plannerTasks.filter((t) => t.percentComplete < 100);
-      answer = tasks.length ? `${tasks.length} tarefa(s) do Planner atribuídas a você em aberto:\n${tasks.slice(0, 10).map((t) => `• ${t.title}${t.dueDateTime ? ` (prazo ${toLocalDateKey(new Date(t.dueDateTime))})` : ''} — ${t.planTitle}`).join('\n')}` : 'Nenhuma tarefa do Planner sincronizada em aberto.';
+      answer = tasks.length ? `${tasks.length} tarefa(s) do Planner atribuídas a você em aberto:\n${tasks.slice(0, 10).map((t) => `• ${t.title}${t.dueDateTime ? ` (prazo ${brDate(toLocalDateKey(new Date(t.dueDateTime)))})` : ''} — ${t.planTitle}`).join('\n')}` : 'Nenhuma tarefa do Planner sincronizada em aberto.';
       break;
     }
     default: {
@@ -322,7 +330,7 @@ export async function askAssistant(app: AppContext, question: string): Promise<A
   if (app.ai.enabledFor('assistant') && (intent === 'search' || !answer)) {
     const context = effectiveOrder(pautas)
       .slice(0, 40)
-      .map((p) => `- [${p.id.slice(0, 8)}] ${truncate(p.title, 80)} | ${STATUS_LABEL[p.status]} | prazo ${p.dueDate ?? '—'} | score ${p.priorityScore}${p.requester ? ` | solicitante ${p.requester}` : ''}`)
+      .map((p) => `- [${p.id.slice(0, 8)}] ${truncate(p.title, 80)} | ${STATUS_LABEL[p.status]} | prazo ${brDate(p.dueDate)} | score ${p.priorityScore}${p.requester ? ` | solicitante ${p.requester}` : ''}`)
       .join('\n');
     const ai = await app.ai.complete('assistant', [
       { role: 'system', content: `Você é o assistente do PautaFlow. Responda em português, de forma objetiva, usando APENAS os dados abaixo. Se a informação não estiver nos dados, diga que não sabe. Hoje é ${toLocalDateKey(now)}.\n\nPautas em aberto:\n${context || '(nenhuma)'}` },

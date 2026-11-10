@@ -123,6 +123,46 @@ describe('pautas e prioridades', () => {
     expect(r.json().completedAt).toBeTruthy();
     expect(r.json().priorityScore).toBe(0);
   });
+  it('atualização parcial preserva os demais campos (regressão: status apagava descrição/prazo/tags)', async () => {
+    const full = (
+      await post('/api/pautas', {
+        title: 'Pauta completa',
+        description: 'Descrição importante',
+        dueDate: '2026-11-30',
+        startDate: '2026-11-01',
+        requester: 'TI',
+        owner: 'Eduardo',
+        manualPriority: 'low',
+        impact: 4,
+        complexity: 5,
+        estimatedHours: 4,
+        tags: ['TVs', 'Email'],
+        checklist: [{ id: 'c1', text: 'Roteiro', done: false }],
+      })
+    ).json();
+    const r = (await patch(`/api/pautas/${full.id}`, { status: 'done' })).json();
+    expect(r.status).toBe('done');
+    for (const k of ['description', 'dueDate', 'startDate', 'requester', 'owner', 'manualPriority', 'impact', 'complexity', 'estimatedHours', 'tags', 'checklist']) {
+      expect(r[k], k).toEqual(full[k]);
+    }
+    const r2 = (await patch(`/api/pautas/${full.id}`, { owner: 'Natanael' })).json();
+    expect(r2.requester).toBe('TI');
+    expect(r2.status).toBe('done');
+  });
+
+  it('prazo com ano digitado a mais é reparado; data impossível vira vazio', async () => {
+    const p = (await post('/api/pautas', { title: 'Datas', dueDate: '262026-11-03' })).json();
+    expect(p.dueDate).toBe('2026-11-03');
+    const r = (await patch(`/api/pautas/${p.id}`, { dueDate: '0002-11-30' })).json();
+    expect(r.dueDate).toBeNull();
+  });
+
+  it('editar projeto parcialmente preserva cor, descrição e palavras-chave', async () => {
+    const pr = (await post('/api/projetos', { name: 'Feira', description: 'Stand', color: '#ff0000', keywords: ['fenasucro'] })).json();
+    const r = (await patch(`/api/projetos/${pr.id}`, { status: 'paused' })).json();
+    expect(r).toMatchObject({ status: 'paused', description: 'Stand', color: '#ff0000', keywords: ['fenasucro'] });
+  });
+
   it('ordem manual e aceite da recomendação', async () => {
     const c = (await post('/api/pautas', { title: 'Terceira pauta' })).json().id;
     let list = (await post('/api/priorities/order', { ids: [c, a] })).json();
@@ -160,6 +200,21 @@ describe('radar com Microsoft Graph (simulado)', () => {
     expect(p.sourceRefs).toHaveLength(2);
     expect(p.impact).toBe(4);
     expect((await get('/api/sugestoes?status=pending')).json()).toHaveLength(0);
+  });
+
+  it('resumo do dia inclui e-mails que pedem ação e reuniões; aviso de reunião é emitido uma vez', async () => {
+    await ctx.scheduler.run('calendar-sync', 'manual');
+    const r = (await post('/api/resumos/generate', { type: 'daily' })).json();
+    const sec = (k: string) => r.sections.find((s: { key: string }) => s.key === k);
+    expect(sec('emails').items.some((i: { text: string; url: string | null }) => i.text.includes('Release Fenasucro') && i.url)).toBe(true);
+    expect(sec('meetings').items[0].text).toBe('Reunião de pauta');
+    expect(sec('inbox').items[0].text).toMatch(/e-mail\(s\) recebido/);
+    expect(r.headline).toMatch(/reunião/);
+    const { meetingReminders } = await import('../src/automation/jobs');
+    expect(await meetingReminders(ctx)).toBe(1);
+    expect(await meetingReminders(ctx)).toBe(0); // sem repetir
+    const notes = (await get('/api/notifications')).json();
+    expect(notes.some((n: { type: string }) => n.type === 'meeting')).toBe(true);
   });
 
   it('calendário sincronizado aparece na agenda e na semana', async () => {

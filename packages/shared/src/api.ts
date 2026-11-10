@@ -111,6 +111,10 @@ export interface CalendarItem {
   priority?: PriorityLevel;
   location?: string | null;
   url?: string | null;
+  /** Link para entrar na reunião online (Teams, Zoom, Meet, Webex), quando houver. */
+  joinUrl?: string | null;
+  /** Abre o item no Outlook. */
+  openUrl?: string | null;
   color?: string | null;
   /** Itens externos (Outlook/Planner) não são movidos localmente. */
   editable: boolean;

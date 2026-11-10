@@ -8,7 +8,6 @@ import { toast } from '@/stores/toast';
 import { MicrosoftConnectPanel, MsStateChip, msState, useMicrosoftLive } from '@/components/settings/MicrosoftConnect';
 import { MicrosoftSources } from '@/components/settings/MicrosoftSources';
 import { AiSettingsPanel } from '@/components/settings/AiSettings';
-import { DiscordCard } from '@/components/settings/DiscordCard';
 import { OutlookLocalCard } from '@/components/settings/OutlookLocalCard';
 import { Note, RowGroup, SectionCard, SettingRow, useDraft } from '@/components/settings/shared';
 
@@ -76,7 +75,6 @@ export default function Integracoes() {
         </div>
 
         <motion.div variants={item}>
-          <DiscordCard />
         </motion.div>
       </motion.div>
     </div>

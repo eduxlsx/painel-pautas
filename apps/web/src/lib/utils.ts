@@ -16,40 +16,49 @@ export function parseDue(due: string): Date {
   return parseISO(due);
 }
 
+export const isValidDate = (d: Date) => !Number.isNaN(d.getTime());
+
 export function toDateKey(d: Date): string {
   return format(d, 'yyyy-MM-dd');
 }
 
-export function fmtDate(iso: string | null | undefined, pattern = "d 'de' MMM"): string {
+export function fmtDate(iso: string | null | undefined, pattern = 'dd/MM/yyyy'): string {
   if (!iso) return '—';
-  return format(parseDue(iso), pattern, { locale: ptBR });
+  const d = parseDue(iso);
+  return isValidDate(d) ? format(d, pattern, { locale: ptBR }) : '—';
 }
 
 export function fmtDateTime(iso: string | null | undefined): string {
   if (!iso) return '—';
-  return format(parseISO(iso), "d MMM, HH:mm", { locale: ptBR });
+  const d = parseISO(iso);
+  return isValidDate(d) ? format(d, 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '—';
 }
 
 export function fmtTime(iso: string): string {
-  return format(parseISO(iso), 'HH:mm');
+  const d = parseISO(iso);
+  return isValidDate(d) ? format(d, 'HH:mm') : '—';
 }
 
 export function fmtRelative(iso: string | null | undefined): string {
   if (!iso) return 'nunca';
-  return formatDistanceToNowStrict(parseISO(iso), { locale: ptBR, addSuffix: true });
+  const d = parseISO(iso);
+  return isValidDate(d) ? formatDistanceToNowStrict(d, { locale: ptBR, addSuffix: true }) : '—';
 }
 
 /** "Hoje", "Amanhã", "Ontem", "em 3 dias", "há 2 dias" + estado de urgência. */
 export function dueLabel(due: string | null | undefined, done = false): { text: string; tone: 'overdue' | 'today' | 'soon' | 'later' | 'none' | 'done' } {
   if (!due) return { text: 'Sem prazo', tone: 'none' };
   const d = parseDue(due);
+  if (!isValidDate(d)) return { text: 'Data inválida', tone: 'none' };
   const diff = differenceInCalendarDays(d, new Date());
-  if (done) return { text: format(d, "d MMM", { locale: ptBR }), tone: 'done' };
+  const hasTime = /Td{2}:d{2}/.test(due);
+  const hh = hasTime ? ' ' + format(d, 'HH:mm') : '';
+  if (done) return { text: format(d, 'dd/MM', { locale: ptBR }) + hh, tone: 'done' };
   if (d.getTime() < Date.now() && !isToday(d)) return { text: isYesterday(d) ? 'Ontem' : `Atrasada ${-diff}d`, tone: 'overdue' };
-  if (isToday(d)) return { text: 'Hoje', tone: 'today' };
-  if (isTomorrow(d)) return { text: 'Amanhã', tone: 'soon' };
-  if (diff <= 5) return { text: format(d, 'EEEE', { locale: ptBR }).replace('-feira', ''), tone: 'soon' };
-  return { text: format(d, "d MMM", { locale: ptBR }), tone: 'later' };
+  if (isToday(d)) return { text: 'Hoje' + hh, tone: d.getTime() < Date.now() ? 'overdue' : 'today' };
+  if (isTomorrow(d)) return { text: 'Amanhã' + hh, tone: 'soon' };
+  if (diff <= 5) return { text: format(d, 'EEEE', { locale: ptBR }).replace('-feira', '') + hh, tone: 'soon' };
+  return { text: format(d, 'dd/MM', { locale: ptBR }) + hh, tone: 'later' };
 }
 
 export function initials(name: string | null | undefined): string {

@@ -1,12 +1,12 @@
 import { type AttentionItem, type Insight, type Pauta, type Sugestao, isOpenStatus } from '@pautaflow/shared';
-import { daysBetween, dueToDate, startOfWeek, addDays } from './dates';
+import { daysBetween, dueToDate, startOfWeek, addDays, brDate } from './dates';
 import { effectiveOrder, remainingHours } from './priority';
 import { isOverdue } from '../analytics/metrics';
 import { truncate } from './text';
 
 export function nextActionFor(p: Pauta, now: Date): { action: string; reason: string } {
   const who = p.requester ? ` com ${p.requester}` : '';
-  if (isOverdue(p, now)) return { action: `Concluir hoje ou renegociar o prazo${who}`, reason: `Atrasada desde ${p.dueDate}` };
+  if (isOverdue(p, now)) return { action: `Concluir hoje ou renegociar o prazo${who}`, reason: `Atrasada desde ${brDate(p.dueDate)}` };
   if (p.approvalPending) return { action: 'Revisar e registrar a aprovação', reason: 'Aprovação pendente' };
   if (p.dependencies.length) return { action: 'Verificar andamento das dependências', reason: 'Depende de outras pautas' };
   if (p.status === 'waiting') return { action: `Cobrar retorno${p.requester ? ` de ${p.requester}` : ''}`, reason: 'Aguardando terceiros' };
@@ -16,7 +16,7 @@ export function nextActionFor(p: Pauta, now: Date): { action: string; reason: st
   const nextSub = p.subtasks.find((s) => !s.done);
   if (nextSub) return { action: `Próxima subtarefa: ${truncate(nextSub.title, 60)}`, reason: 'Subtarefas pendentes' };
   if (p.status === 'in_progress') return { action: 'Continuar a execução e atualizar o status', reason: 'Em andamento' };
-  return { action: 'Iniciar a execução', reason: p.dueDate ? `Prazo em ${p.dueDate}` : 'Prioridade recomendada' };
+  return { action: 'Iniciar a execução', reason: p.dueDate ? `Prazo em ${brDate(p.dueDate)}` : 'Prioridade recomendada' };
 }
 
 export function attentionList(pautas: Pauta[], now: Date, limit = 6): AttentionItem[] {

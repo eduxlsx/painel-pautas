@@ -3,7 +3,7 @@ import { type Pauta, type PautaInput, type RadarStatus, Sugestao, isOpenStatus }
 import type { AppContext } from '../core/context';
 import { analyzeMail, analyzePlannerTask, deduplicate, type DemandCandidate, type RadarContext } from '../intelligence/radar';
 import type { QueueItem } from '../storage/internalSchemas';
-import { dueToDate, toLocalDateKey } from '../intelligence/dates';
+import { dueToDate, toLocalDateKey, brDate } from '../intelligence/dates';
 import { truncate } from '../intelligence/text';
 
 export interface RadarRunResult {
@@ -296,6 +296,72 @@ export class RadarService {
     return s;
   }
 
+  /**
+   * Refaz a análise das fontes já sincronizadas (útil após ajustar regras, categorias ou a IA).
+   * Remove apenas sugestões pendentes sem decisão; aprovadas, vinculadas, ignoradas e adiadas são preservadas
+   * e continuam impedindo que o mesmo item volte a ser sugerido.
+   */
+  async reanalyze(): Promise<{ removed: number; updated: number; enqueued: number; result: RadarRunResult }> {
+    const { db } = this.app;
+    const ctx = this.context();
+    const minConf = db.config.get().radar.minConfidence;
+    // 1) Reavalia as sugestões pendentes no lugar (evita recriá-las e duplicar notificações)
+    let removed = 0;
+    let updated = 0;
+    for (const s of db.sugestoes.filter((x) => x.status === 'pending')) {
+      const ref = s.sourceRefs[0];
+      if (!ref) continue;
+      const cand =
+        ref.source === 'outlook'
+          ? (() => {
+              const m = db.mensagens.get(ref.externalId);
+              return m ? analyzeMail(m, ctx) : undefined;
+            })()
+          : ref.source === 'planner'
+            ? (() => {
+                const t = db.plannerTasks.get(ref.externalId);
+                return t ? analyzePlannerTask(t, ctx) : undefined;
+              })()
+            : undefined;
+      if (cand === undefined) continue; // fonte não está mais em cache: mantém
+      if (cand === null || cand.confidence < minConf) {
+        await db.sugestoes.remove(s.id);
+        removed++;
+        continue;
+      }
+      await db.sugestoes.patch(s.id, (d) => {
+        Object.assign(d, {
+          title: cand.title,
+          kind: cand.kind,
+          approvalPending: cand.approvalPending,
+          suggestedPriority: cand.priority,
+          confidence: cand.confidence,
+          signals: cand.signals,
+          justification: cand.justification,
+          dueDate: d.dueDate ?? cand.dueDate,
+          categoryId: d.categoryId ?? cand.categoryId,
+          projectId: d.projectId ?? cand.projectId,
+          updatedAt: new Date().toISOString(),
+        });
+      });
+      updated++;
+    }
+    // 2) Reanalisa os itens que não geraram sugestão nem pauta
+    const referenced = new Set([...db.pautas.list().flatMap((p) => p.sourceRefs), ...db.sugestoes.list().flatMap((s) => s.sourceRefs)].map((r) => `${r.source}:${r.externalId}`));
+    await db.sincronizacao.update((s) => {
+      for (const k of Object.keys(s.radar.processed)) if (!referenced.has(k)) delete s.radar.processed[k];
+    });
+    const enqueued = await this.enqueue([
+      ...db.mensagens.list().filter((m) => !referenced.has(`outlook:${m.id}`)).map((m) => ({ source: 'outlook' as const, externalId: m.id, reason: 'updated' as const })),
+      ...db.plannerTasks.list().filter((t) => !referenced.has(`planner:${t.id}`)).map((t) => ({ source: 'planner' as const, externalId: t.id, reason: 'updated' as const })),
+    ]);
+    let result = await this.processQueue(10_000);
+    while (this.queueSize() > 0 && result.processed > 0) result = await this.processQueue(10_000);
+    await this.app.history.record({ entity: 'sistema', entityId: null, action: 'radar_reanalyzed', summary: `Radar reanalisado: ${removed} sugestão(ões) descartada(s), ${updated} atualizada(s), ${result.created} nova(s)`, actor: 'user' });
+    this.app.bus.changed('sugestoes');
+    return { removed, updated, enqueued, result };
+  }
+
   /** Reativa sugestões adiadas cujo prazo de adiamento passou. */
   async reactivateSnoozed(): Promise<number> {
     const now = new Date().toISOString();
@@ -367,9 +433,9 @@ export class RadarService {
       if (p.dueDate) {
         const due = dueToDate(p.dueDate).getTime();
         if (due < now.getTime()) {
-          if (await notify.notify({ type: 'overdue', severity: 'critical', title: `Atrasada: ${truncate(p.title, 70)}`, body: `Prazo era ${p.dueDate}.`, link: `/pautas?id=${p.id}`, dedupeKey: `overdue:${p.id}:${today}` })) count++;
+          if (await notify.notify({ type: 'overdue', severity: 'critical', title: `Atrasada: ${truncate(p.title, 70)}`, body: `Prazo era ${brDate(p.dueDate)}.`, link: `/pautas?id=${p.id}`, dedupeKey: `overdue:${p.id}:${today}` })) count++;
         } else if (due - now.getTime() <= warnMs) {
-          if (await notify.notify({ type: 'deadline', severity: 'warning', title: `Prazo próximo: ${truncate(p.title, 70)}`, body: `Vence em ${p.dueDate}.`, link: `/pautas?id=${p.id}`, dedupeKey: `deadline:${p.id}:${p.dueDate}` })) count++;
+          if (await notify.notify({ type: 'deadline', severity: 'warning', title: `Prazo próximo: ${truncate(p.title, 70)}`, body: `Vence em ${brDate(p.dueDate)}.`, link: `/pautas?id=${p.id}`, dedupeKey: `deadline:${p.id}:${brDate(p.dueDate)}` })) count++;
         }
       }
       if (p.recommendedPriority === 'critical') {

@@ -268,7 +268,7 @@ function CompactItem({ item }: { item: CalendarItem }) {
   );
   const cls = cn('block w-full rounded-lg px-1.5 py-1 text-[11.5px] font-medium text-fg', item.kind === 'event' ? 'bg-sky-500/[0.08]' : 'bg-emerald-500/[0.08]', item.url && 'hover:brightness-110');
   return item.url ? (
-    <a href={item.url} target="_blank" rel="noopener noreferrer" className={cls} onClick={(e) => e.stopPropagation()} title={`${item.title} — abrir no ${item.kind === 'event' ? 'Outlook' : 'Planner'}`}>
+    <a href={item.url} target="_blank" rel="noopener noreferrer" className={cls} onClick={(e) => e.stopPropagation()} title={item.joinUrl ? `${item.title} — entrar na reunião` : `${item.title} — abrir no ${item.kind === "event" ? "Outlook" : "Planner"}`}>
       {inner}
     </a>
   ) : (

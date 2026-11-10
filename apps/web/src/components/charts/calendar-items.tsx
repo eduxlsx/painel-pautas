@@ -123,7 +123,7 @@ export function ExternalChip({ item, dense, className }: { item: CalendarItem; d
           </div>
         )}
       </div>
-      {item.url && <ExternalLink className="mt-0.5 size-3 shrink-0 text-fg-3 opacity-60 group-hover:opacity-100" />}
+      {item.joinUrl ? <Video className="mt-0.5 size-3.5 shrink-0 text-sky-600 dark:text-sky-300" /> : item.url && <ExternalLink className="mt-0.5 size-3 shrink-0 text-fg-3 opacity-60 group-hover:opacity-100" />}
     </>
   );
   const cls = cn(
@@ -134,7 +134,7 @@ export function ExternalChip({ item, dense, className }: { item: CalendarItem; d
     className,
   );
   return item.url ? (
-    <a href={item.url} target="_blank" rel="noopener noreferrer" className={cls} title={isEvent ? 'Abrir no Outlook' : 'Abrir no Planner'} onClick={(e) => e.stopPropagation()}>
+    <a href={item.url} target="_blank" rel="noopener noreferrer" className={cls} title={item.joinUrl ? "Entrar na reunião" : isEvent ? "Abrir no Outlook" : "Abrir no Planner"} onClick={(e) => e.stopPropagation()}>
       {body}
     </a>
   ) : (

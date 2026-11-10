@@ -131,6 +131,18 @@ export function buildJobs(app: AppContext): JobDef[] {
       },
     },
     {
+      id: 'meeting-reminder',
+      name: 'Aviso de reuniões',
+      description: 'Avisa quando uma reunião do calendário está para começar (com o link para entrar, se houver).',
+      schedule: { kind: 'interval', minutes: () => 1 },
+      describe: () => `A cada minuto · aviso ${cfg().notifications.meetingReminderMinutes} min antes`,
+      available: async () => (cfg().notifications.meetingReminderMinutes > 0 ? true : 'Aviso de reuniões desligado em Configurações'),
+      run: async () => {
+        const n = await meetingReminders(app);
+        return { processed: n, message: n ? `${n} aviso(s) de reunião enviado(s)` : 'Nenhuma reunião próxima' };
+      },
+    },
+    {
       id: 'daily-summary',
       name: 'Resumo diário',
       description: 'Gerado no início do expediente.',
@@ -139,6 +151,7 @@ export function buildJobs(app: AppContext): JobDef[] {
       available: async () => true,
       run: async () => {
         const r = await app.summaries.generate('daily');
+        await app.notify.notify({ type: 'system', severity: 'info', title: 'Seu resumo do dia está pronto', body: r.headline, link: '/', dedupeKey: `daily-summary:${r.periodStart}`, native: true });
         return { processed: 1, message: r.headline };
       },
     },
@@ -191,6 +204,33 @@ export function buildJobs(app: AppContext): JobDef[] {
       },
     },
   ];
+}
+
+/** Gera um aviso por reunião que começa dentro da antecedência configurada. */
+export async function meetingReminders(app: AppContext, now = new Date()): Promise<number> {
+  const minutes = app.db.config.get().notifications.meetingReminderMinutes;
+  if (minutes <= 0) return 0;
+  const horizon = now.getTime() + minutes * 60_000;
+  let sent = 0;
+  for (const e of app.db.eventos.list()) {
+    if (e.isCancelled || e.isAllDay || e.showAs === 'free') continue;
+    const start = new Date(e.start).getTime();
+    if (Number.isNaN(start) || start > horizon || start < now.getTime() - 60_000) continue;
+    const mins = Math.max(0, Math.round((start - now.getTime()) / 60_000));
+    const hhmm = new Date(start).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const n = await app.notify.notify({
+      type: 'meeting',
+      severity: 'warning',
+      title: mins > 0 ? `Reunião em ${mins} min: ${e.subject}` : `Reunião começando: ${e.subject}`,
+      body: `${hhmm}${e.location ? ` · ${e.location}` : ''}${e.onlineMeetingUrl ? ' · clique para entrar' : ''}`,
+      link: e.onlineMeetingUrl ?? e.webLink,
+      dedupeKey: `meeting:${e.id}:${e.start}`,
+      dedupeHours: 12,
+      native: true,
+    });
+    if (n) sent++;
+  }
+  return sent;
 }
 
 /** Registra um retrato diário de indicadores (base para tendências observadas). */

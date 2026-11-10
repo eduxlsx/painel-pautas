@@ -93,3 +93,11 @@ export function sentences(text: string): string[] {
 export function truncate(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s;
 }
+
+const JOIN_URL = /https:\/\/(teams\.microsoft\.com\/(l\/meetup-join|meet)\/|teams\.live\.com\/meet\/|[\w.-]*zoom\.us\/(j|my|w)\/|meet\.google\.com\/|[\w.-]*webex\.com\/(meet|join|[\w.-]+\/j\.php))[^\s<>"]+/i;
+
+/** Encontra o link de entrada de uma reunião online (Teams, Zoom, Google Meet, Webex). */
+export function findJoinUrl(text: string | null | undefined): string | null {
+  const m = JOIN_URL.exec(text ?? '');
+  return m ? m[0].replace(/[>")\].,;]+$/, '') : null;
+}

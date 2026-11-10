@@ -4,7 +4,7 @@ import { Check, Pipette } from 'lucide-react';
 import type { Projeto } from '@pautaflow/shared';
 import { useSaveProjeto } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-import { Button, Dialog, Field, Input, Segmented, Textarea } from '@/components/ui';
+import { Button, DateInput, Dialog, Field, Input, Segmented, Textarea } from '@/components/ui';
 import { ChipsInput } from './ChipsInput';
 
 export const PROJECT_COLORS = ['#6366f1', '#8b5cf6', '#d946ef', '#ec4899', '#ef4444', '#f97316', '#f59e0b', '#10b981', '#14b8a6', '#0ea5e9', '#64748b'];
@@ -169,7 +169,7 @@ export function ProjectEditorDialog({ open, onOpenChange, projeto, onSaved }: { 
             <Input value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Nome" />
           </Field>
           <Field label="Prazo">
-            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <DateInput value={dueDate} onValueChange={setDueDate} />
           </Field>
         </div>
 

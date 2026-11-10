@@ -18,6 +18,7 @@ import {
   SOURCE_LABEL,
 } from '@pautaflow/shared';
 import type { AppContext } from '../core/context';
+import { onlyProvided } from '../core/patch';
 import { askAssistant, calendarItems, dashboard, priorityList, weekView } from '../modules/views';
 import { computeAnalytics, resolvePeriod, toCsv, type PeriodKey } from '../analytics/metrics';
 import { addDays, startOfDay } from '../intelligence/dates';
@@ -154,7 +155,7 @@ export function registerApi(app: FastifyInstance, ctx: AppContext) {
     const body = PautaInput.extend({ title: z.string().min(1, 'Informe o título') }).parse(req.body);
     return pautas.create(body, { origin: 'manual', actor: 'user' });
   });
-  app.patch('/api/pautas/:id', async (req) => pautas.update((req.params as { id: string }).id, PautaInput.parse(req.body)));
+  app.patch('/api/pautas/:id', async (req) => pautas.update((req.params as { id: string }).id, (req.body ?? {}) as PautaInput));
   app.delete('/api/pautas/:id', async (req) => {
     await pautas.remove((req.params as { id: string }).id);
     return { ok: true };
@@ -172,7 +173,7 @@ export function registerApi(app: FastifyInstance, ctx: AppContext) {
     return p;
   });
   app.patch('/api/projetos/:id', async (req) => {
-    const input = ProjetoInput.parse(req.body);
+    const input = onlyProvided(ProjetoInput.parse(req.body), req.body);
     const p = await db.projetos.patch((req.params as { id: string }).id, (d) => {
       Object.assign(d, input);
       d.updatedAt = new Date().toISOString();
@@ -203,7 +204,7 @@ export function registerApi(app: FastifyInstance, ctx: AppContext) {
     return c;
   });
   app.patch('/api/categorias/:id', async (req) => {
-    const input = CategoriaInput.parse(req.body);
+    const input = onlyProvided(CategoriaInput.parse(req.body), req.body);
     const c = await db.categorias.patch((req.params as { id: string }).id, (d) => {
       Object.assign(d, input);
     });
@@ -227,13 +228,14 @@ export function registerApi(app: FastifyInstance, ctx: AppContext) {
     void scheduler.runChain(['outlook-sync', 'planner-sync', 'calendar-sync', 'radar-analysis'], 'manual');
     return { started: true };
   });
+  app.post('/api/radar/reanalyze', async () => radar.reanalyze());
   app.get('/api/sugestoes', async (req) => {
     const { status } = req.query as { status?: string };
     return db.sugestoes
       .filter((s) => !status || status.split(',').includes(s.status))
       .sort((a, b) => (b.receivedAt ?? b.createdAt).localeCompare(a.receivedAt ?? a.createdAt));
   });
-  app.post('/api/sugestoes/:id/approve', async (req) => radar.approve((req.params as { id: string }).id, PautaInput.parse(req.body ?? {})));
+  app.post('/api/sugestoes/:id/approve', async (req) => radar.approve((req.params as { id: string }).id, onlyProvided(PautaInput.parse(req.body ?? {}), req.body)));
   app.post('/api/sugestoes/:id/ignore', async (req) => radar.ignore((req.params as { id: string }).id));
   app.post('/api/sugestoes/:id/restore', async (req) => radar.restore((req.params as { id: string }).id));
   app.post('/api/sugestoes/:id/snooze', async (req) => {
@@ -390,11 +392,6 @@ export function registerApi(app: FastifyInstance, ctx: AppContext) {
       .send(`<!doctype html><meta charset="utf-8"><title>PautaFlow</title><body style="font-family:system-ui;display:grid;place-items:center;height:100vh;margin:0;background:#0b1020;color:#e2e8f0"><p>${msg.replace(/[<>&]/g, '')}</p><script>setTimeout(()=>window.close(),1500)</script>`);
   });
 
-  app.get('/api/integrations/discord', async () => ctx.discord.status());
-  app.post('/api/integrations/discord/panel', async () => {
-    await ctx.discord.refreshPanel(true);
-    return ctx.discord.status();
-  });
 
   app.get('/api/ai/status', async () => ai.status(true));
   app.get('/api/ai/ollama/models', async () => {

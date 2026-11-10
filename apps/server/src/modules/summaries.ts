@@ -1,14 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { type Resumo, type SummarySection, isOpenStatus, STATUS_LABEL } from '@pautaflow/shared';
 import type { AppContext } from '../core/context';
-import { addDays, dueToDate, startOfDay, startOfWeek, toLocalDateKey } from '../intelligence/dates';
+import { addDays, dueToDate, startOfDay, startOfWeek, toLocalDateKey, brDate } from '../intelligence/dates';
 import { effectiveOrder } from '../intelligence/priority';
 import { buildInsights, nextActionFor } from '../intelligence/insights';
 import { computeAnalytics, isOverdue } from '../analytics/metrics';
 import { truncate } from '../intelligence/text';
+import { analyzeMail } from '../intelligence/radar';
 
 type Item = SummarySection['items'][number];
-const item = (text: string, pautaId: string | null = null, meta: string | null = null): Item => ({ text, pautaId, meta });
+const item = (text: string, pautaId: string | null = null, meta: string | null = null, url: string | null = null): Item => ({ text, pautaId, meta, url });
 
 export class SummaryService {
   constructor(private readonly app: AppContext) {}
@@ -58,16 +59,73 @@ export class SummaryService {
     const insights = buildInsights(pautas, db.sugestoes.list(), now, cfg.workday.dailyCapacityHours, cfg.workday.days);
     const sections: SummarySection[] = [
       { key: 'today', title: 'Entregas de hoje', items: dueToday.map((p) => item(p.title, p.id, STATUS_LABEL[p.status])) },
-      { key: 'progress', title: 'Pautas em andamento', items: inProgress.map((p) => item(p.title, p.id, p.dueDate ? `prazo ${p.dueDate}` : null)) },
-      { key: 'overdue', title: 'Atividades atrasadas', items: overdue.map((p) => item(p.title, p.id, `desde ${p.dueDate}`)) },
+      { key: 'progress', title: 'Pautas em andamento', items: inProgress.map((p) => item(p.title, p.id, p.dueDate ? `prazo ${brDate(p.dueDate)}` : null)) },
+      { key: 'overdue', title: 'Atividades atrasadas', items: overdue.map((p) => item(p.title, p.id, `desde ${brDate(p.dueDate)}`)) },
       { key: 'approvals', title: 'Pendências de aprovação', items: approvals.map((p) => item(p.title, p.id, STATUS_LABEL[p.status])) },
       { key: 'suggestions', title: 'Novas sugestões', items: newSugs.map((s) => item(s.title, null, s.source)) },
       { key: 'priorities', title: 'Principais prioridades', items: top.map((p) => item(p.title, p.id, `score ${p.priorityScore} · ${nextActionFor(p, now).action}`)) },
       { key: 'recommendations', title: 'Recomendações', items: insights.map((i) => item(i.text, i.pautaIds[0] ?? null)) },
     ];
+
+    /* ---------------- Reuniões de hoje ---------------- */
+    const hm = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const meetings = db.eventos
+      .filter((e) => !e.isCancelled && (e.isAllDay ? e.start.slice(0, 10) === today : toLocalDateKey(new Date(e.start)) === today))
+      .sort((a, b) => a.start.localeCompare(b.start));
+    sections.splice(1, 0, {
+      key: 'meetings',
+      title: 'Reuniões de hoje',
+      items: meetings.map((e) =>
+        item(e.subject, null, `${e.isAllDay ? 'dia inteiro' : `${hm(e.start)}–${hm(e.end)}`}${e.onlineMeetingUrl ? ' · online' : e.location ? ` · ${truncate(e.location, 30)}` : ''}`, e.onlineMeetingUrl ?? e.webLink),
+      ),
+    });
+
+    /* ---------------- E-mails (últimas 24h) ---------------- */
+    const inbox = db.mensagens.filter((m) => !m.isSent && m.receivedAt >= dayAgo).sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
+    const tracked = new Set([...db.pautas.list().flatMap((p) => p.sourceRefs), ...db.sugestoes.list().flatMap((s) => s.sourceRefs)].map((r) => r.externalId));
+    const profile = db.users.get();
+    const radarCtx = {
+      now,
+      myEmails: [db.integracoes.get().microsoft.username, profile.email].filter((x): x is string => !!x).map((x) => x.toLowerCase()),
+      categories: db.categorias.list(),
+      projects: db.projetos.list(),
+      ignoreSenders: cfg.radar.ignoreSenders,
+    };
+    const actionable = inbox
+      .map((m) => ({ m, c: analyzeMail(m, radarCtx) }))
+      .filter((x) => x.m.flagged || (x.c && x.c.confidence >= cfg.radar.minConfidence))
+      .sort((a, b) => (b.c?.confidence ?? 0.5) - (a.c?.confidence ?? 0.5))
+      .slice(0, 10);
+    const senders = new Map<string, number>();
+    for (const m of inbox) {
+      const k = m.fromName || m.fromEmail || 'Desconhecido';
+      senders.set(k, (senders.get(k) ?? 0) + 1);
+    }
+    const unread = inbox.filter((m) => !m.isRead).length;
+    const important = inbox.filter((m) => m.importance === 'high').length;
+    const flaggedOpen = db.mensagens.filter((m) => m.flagged && !m.isSent && !tracked.has(m.id));
+    sections.splice(2, 0, {
+      key: 'emails',
+      title: 'E-mails que pedem ação',
+      items: actionable.map(({ m, c }) =>
+        item(`${m.subject || '(sem assunto)'} — ${m.fromName ?? m.fromEmail ?? ''}`, null, [m.flagged ? 'sinalizado' : null, c?.dueDate ? `prazo ${brDate(c.dueDate)}` : null, tracked.has(m.id) ? 'já no radar' : null].filter(Boolean).join(' · ') || null, m.webLink),
+      ),
+    });
+    sections.splice(3, 0, {
+      key: 'inbox',
+      title: 'Caixa de entrada (24h)',
+      items: [
+        item(`${inbox.length} e-mail(s) recebido(s), ${unread} não lido(s)${important ? `, ${important} com importância alta` : ''}`),
+        ...[...senders.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, n]) => item(name, null, `${n} e-mail(s)`)),
+        ...flaggedOpen.slice(0, 5).map((m) => item(`Sinalizado sem pauta: ${m.subject}`, null, m.fromName, m.webLink)),
+      ],
+    });
+
     const parts = [
       `${dueToday.length} entrega(s) hoje`,
       overdue.length ? `${overdue.length} atrasada(s)` : null,
+      meetings.length ? `${meetings.length} reunião(ões)` : null,
+      inbox.length ? `${inbox.length} e-mail(s) nas últimas 24h (${actionable.length} pedindo ação)` : null,
       approvals.length ? `${approvals.length} pendência(s) de aprovação` : null,
       `${newSugs.length} nova(s) sugestão(ões)`,
     ].filter(Boolean);
@@ -77,6 +135,10 @@ export class SummaryService {
       overdue: overdue.length,
       approvals: approvals.length,
       newSuggestions: newSugs.length,
+      meetings: meetings.length,
+      emails: inbox.length,
+      emailsActionable: actionable.length,
+      unread,
     });
   }
 
@@ -117,7 +179,7 @@ export class SummaryService {
     const upcoming = effectiveOrder(open).filter((p) => p.dueDate && dueToDate(p.dueDate) < nextWeekEnd).slice(0, 6);
     const metric = (k: string) => a.metrics.find((m) => m.key === k)?.value ?? null;
     const sections: SummarySection[] = [
-      { key: 'done', title: 'Atividades concluídas', items: done.map((p) => item(p.title, p.id, p.completedAt?.slice(0, 10) ?? null)) },
+      { key: 'done', title: 'Atividades concluídas', items: done.map((p) => item(p.title, p.id, p.completedAt ? brDate(toLocalDateKey(new Date(p.completedAt))) : null)) },
       { key: 'received', title: 'Demandas recebidas', items: received.map((p) => item(p.title, p.id, p.origin)) },
       { key: 'pending', title: 'Demandas pendentes', items: effectiveOrder(open).slice(0, 10).map((p) => item(p.title, p.id, STATUS_LABEL[p.status])) },
       { key: 'projects', title: 'Projetos movimentados', items: [...projects.entries()].sort((x, y) => y[1] - x[1]).map(([id, n]) => item(projName(id), null, `${n} movimentação(ões)`)) },
@@ -134,7 +196,7 @@ export class SummaryService {
         ],
       },
       { key: 'bottlenecks', title: 'Gargalos', items: bottlenecks },
-      { key: 'next', title: 'Recomendações para a próxima semana', items: upcoming.map((p) => item(`${p.title} — ${nextActionFor(p, now).action}`, p.id, p.dueDate)) },
+      { key: 'next', title: 'Recomendações para a próxima semana', items: upcoming.map((p) => item(`${p.title} — ${nextActionFor(p, now).action}`, p.id, p.dueDate ? brDate(p.dueDate) : null)) },
     ];
     return this.make('weekly', from, to, `Semana: ${done.length} concluída(s), ${received.length} recebida(s), ${open.length} em aberto.`, sections, {
       done: done.length,

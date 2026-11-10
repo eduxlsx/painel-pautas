@@ -193,3 +193,16 @@ export function extractDeadline(text: string, ref: Date = new Date()): Extracted
   const evidence = `${start > 0 ? '…' : ''}${text.slice(start, end).replace(/\s+/g, ' ').trim()}${end < text.length ? '…' : ''}`;
   return { date: toLocalDateKey(best.date), time, evidence, confidence: Number(best.conf.toFixed(2)), hasContext: best.hasContext };
 }
+
+/** Data no padrão brasileiro para textos: "03/11/2026" ou "03/11/2026 às 14:00". */
+export function brDate(due: string | null | undefined): string {
+  if (!due) return '—';
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/.exec(due);
+  if (!m) return due;
+  if (/Z|[+-]\d{2}:?\d{2}$/.test(due)) {
+    const d = new Date(due);
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} às ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+  return `${m[3]}/${m[2]}/${m[1]}${m[4] ? ` às ${m[4]}:${m[5]}` : ''}`;
+}

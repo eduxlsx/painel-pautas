@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { Bell, Plus, Search, Sparkles, Sun, Moon, Monitor, CheckCheck, AlertTriangle, CalendarClock, Inbox, Info, PlugZap, Flame, History } from 'lucide-react';
+import { Bell, Video, Plus, Search, Sparkles, Sun, Moon, Monitor, CheckCheck, AlertTriangle, CalendarClock, Inbox, Info, PlugZap, Flame, History } from 'lucide-react';
 import type { Notificacao } from '@pautaflow/shared';
 import { Button, Kbd, Popover, PopoverContent, PopoverTrigger, Tip, EmptyState } from '@/components/ui';
 import { useBootstrap, useNotifications, useSaveConfig } from '@/lib/queries';
@@ -19,6 +19,7 @@ const NOTIF_ICON: Record<Notificacao['type'], React.ReactNode> = {
   sync: <Info />,
   forgotten: <History />,
   system: <Info />,
+  meeting: <Video />,
 };
 const SEV: Record<Notificacao['severity'], string> = {
   info: 'bg-accent-soft text-accent',

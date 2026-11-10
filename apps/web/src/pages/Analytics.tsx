@@ -32,7 +32,7 @@ import type { AnalyticsResponse, ChartDatum, MetricValue, Resumo } from '@pautaf
 import { cn, download, fmtDate, fmtDateTime, toDateKey } from '@/lib/utils';
 import { post, useAnalytics, useApiMutation, useResumos } from '@/lib/queries';
 import { useUi } from '@/stores/ui';
-import { Button, CardHeader, EmptyState, GlassCard, Input, PageHeader, Segmented, Skeleton, STATUS_HEX, Tip } from '@/components/ui';
+import { Button, CardHeader, DateInput, EmptyState, GlassCard, Input, PageHeader, Segmented, Skeleton, STATUS_HEX, Tip } from '@/components/ui';
 import { AreaGradient, AXIS, BAR_CURSOR, ChartBox, CountUp, CURSOR, Donut, GlassTooltip, GRID, InlineLegend, seriesColor } from '@/components/charts/kit';
 import { Heatmap } from '@/components/charts/Heatmap';
 
@@ -45,7 +45,7 @@ const item: Variants = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0
 /** Métricas em que "subir" é ruim. */
 const LOWER_IS_BETTER = new Set(['overdue', 'leadTime', 'sugIgnored', 'backlogDays']);
 
-const dayTick = (d: string) => format(parseISO(d), 'd MMM', { locale: ptBR }).replace('.', '');
+const dayTick = (d: string) => format(parseISO(d), 'dd/MM', { locale: ptBR });
 const monthTick = (d: string) => format(parseISO(`${d}-01`), 'MMM yy', { locale: ptBR }).replace('.', '');
 const hasValues = (d: ChartDatum[]) => d.some((x) => x.value > 0);
 
@@ -72,7 +72,7 @@ export default function Analytics() {
       <PageHeader
         eyebrow="Intelligence Analytics"
         title="Indicadores e tendências"
-        subtitle={data ? `${data.period.label} · ${fmtDate(data.period.from, "d 'de' MMM")} a ${fmtDate(data.period.to, "d 'de' MMM 'de' yyyy")}` : 'Produtividade observada a partir das suas pautas'}
+        subtitle={data ? `${data.period.label} · ${fmtDate(data.period.from)} a ${fmtDate(data.period.to)}` : 'Produtividade observada a partir das suas pautas'}
         actions={
           <div className="pf-no-print flex flex-wrap items-center gap-2">
             <Button size="sm" variant="secondary" onClick={() => download(`/api/analytics/export?format=json&${qs}`)}>
@@ -108,9 +108,9 @@ export default function Analytics() {
         <AnimatePresence initial={false}>
           {custom && (
             <motion.div key="custom" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="flex items-center gap-2">
-              <Input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className="h-9 w-[150px]" aria-label="Data inicial" />
+              <DateInput value={from} onValueChange={setFrom} className="w-[150px]" aria-label="Data inicial" />
               <span className="text-sm text-fg-3">até</span>
-              <Input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className="h-9 w-[150px]" aria-label="Data final" />
+              <DateInput value={to} onValueChange={setTo} className="w-[150px]" aria-label="Data final" />
               {!validCustom && <span className="text-xs text-critical">Período inválido</span>}
             </motion.div>
           )}
@@ -515,7 +515,7 @@ function periodLabel(r: Resumo): string {
   const e = r.periodEnd.length > 10 ? toDateKey(parseISO(r.periodEnd)) : r.periodEnd;
   if (r.type === 'daily' || s === e) return fmtDate(s, "EEEE, d 'de' MMMM");
   if (r.type === 'monthly') return fmtDate(s, "MMMM 'de' yyyy");
-  return `${fmtDate(s, "d 'de' MMM")} – ${fmtDate(e, "d 'de' MMM")}`;
+  return `${fmtDate(s)} – ${fmtDate(e)}`;
 }
 
 function ResumoRow({ resumo: r }: { resumo: Resumo }) {

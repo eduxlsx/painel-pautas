@@ -60,6 +60,8 @@ import {
   Tip,
   useConfirm,
   PRIORITY_HEX,
+  DateInput,
+  DueInput,
 } from '@/components/ui';
 import { useLookups } from './PautaCard';
 import { COMPLEXITY_LABEL, IMPACT_LABEL, PriorityOptions, dateInput, effectivePriority } from './helpers';
@@ -468,10 +470,10 @@ function MetaGrid({ pauta: p, save }: { pauta: Pauta; save: Save }) {
         <MetaText value={p.owner ?? ''} placeholder="—" onSave={(v) => save({ owner: v || null })} />
       </Meta>
       <Meta label={<span className="flex items-center gap-1">Prazo {p.dueLocked && <Tip content="Prazo definido por você: sincronizações não o alteram"><Lock className="size-3" /></Tip>}</span>}>
-        <MetaDate value={dateInput(p.dueDate)} onSave={(v) => save({ dueDate: v || null })} />
+        <DueInput value={p.dueDate} onValueChange={(v) => v !== p.dueDate && save({ dueDate: v })} className="w-full" />
       </Meta>
       <Meta label="Início">
-        <MetaDate value={dateInput(p.startDate)} onSave={(v) => save({ startDate: v || null })} />
+        <DateInput value={dateInput(p.startDate)} onValueChange={(v) => save({ startDate: v || null })} className="w-full" aria-label="Início" />
       </Meta>
       <Meta label="Impacto">
         <MetaSelect value={String(p.impact)} onChange={(v) => save({ impact: Number(v) })}>
@@ -564,9 +566,6 @@ function MetaText({ value, onSave, placeholder, numeric, suffix }: { value: stri
   );
 }
 
-function MetaDate({ value, onSave }: { value: string; onSave: (v: string) => void }) {
-  return <input type="date" value={value} onChange={(e) => e.target.value !== value && onSave(e.target.value)} className={cn(metaCtl, 'tabular cursor-pointer dark:[color-scheme:dark]')} />;
-}
 
 function DescriptionPanel({ pauta: p, save }: { pauta: Pauta; save: Save }) {
   const [editing, setEditing] = useState(false);
@@ -720,7 +719,7 @@ function SubtasksPanel({ pauta: p, save }: { pauta: Pauta; save: Save }) {
       {p.subtasks.length === 0 && <p className="px-1.5 text-xs text-fg-3">Quebre a pauta em etapas com prazo próprio.</p>}
       <AddRow
         placeholder="Nova subtarefa"
-        extra={<Input type="date" value={due} onChange={(e) => setDue(e.target.value)} className="tabular h-9 dark:[color-scheme:dark] w-[150px] shrink-0" aria-label="Prazo da subtarefa" />}
+        extra={<DateInput value={due} onValueChange={setDue} className="w-[150px] shrink-0" aria-label="Prazo da subtarefa" />}
         onAdd={(title) => {
           set([...p.subtasks, { id: uid(), title, done: false, dueDate: due || null }]);
           setDue('');
@@ -1127,7 +1126,7 @@ function useFormatValue() {
       if (key === 'kind' && v in KIND_LABEL) return KIND_LABEL[v as PautaKind];
       if (key === 'projectId') return project(v)?.name ?? 'projeto removido';
       if (key === 'categoryId') return category(v)?.name ?? 'categoria removida';
-      if (/^\d{4}-\d{2}-\d{2}/.test(v)) return fmtDate(v, 'd MMM yyyy');
+      if (/^\d{4}-\d{2}-\d{2}/.test(v)) return fmtDate(v, 'dd/MM/yyyy');
       return v.length > 40 ? `${v.slice(0, 40)}…` : v;
     }
     return String(v);

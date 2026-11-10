@@ -108,7 +108,7 @@ function SheetBody({ projeto: p, pautas, stats, onClose, onEdit }: { projeto: Pr
           )}
           {p.dueDate && (
             <Badge icon={<CalendarClock />} tone="neutral">
-              Prazo {fmtDate(p.dueDate, "d 'de' MMM yyyy")}
+              Prazo {fmtDate(p.dueDate)}
             </Badge>
           )}
           {p.keywords.map((k) => (

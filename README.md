@@ -86,26 +86,6 @@ O sistema funciona integralmente sem IA. Em *Integrações → Inteligência*:
 
 A IA enriquece: interpretação de e-mails no radar, narrativa dos resumos e perguntas abertas no assistente. Prioridades, prazos, atrasos, métricas e resumos estruturados são sempre determinísticos.
 
-## Bot do Discord (opcional)
-
-Veja e gerencie suas pautas pelo Discord. Os canais já estão configurados no `.env`; falta apenas o token.
-
-1. Em [discord.com/developers/applications](https://discord.com/developers/applications) → **New Application** → **Bot** → **Reset Token** → copie para `DISCORD_BOT_TOKEN` no `.env`. Nenhuma *privileged intent* é necessária.
-2. **OAuth2 → URL Generator**: escopos `bot` e `applications.commands`; permissões *View Channels*, *Send Messages*, *Embed Links*, *Read Message History* e *Manage Messages* (para fixar o painel). Abra a URL e adicione o bot ao servidor.
-3. Opcional, recomendado: preencha `DISCORD_ALLOWED_USER_IDS` com o seu ID (sem isso, só o dono do servidor pode usar os comandos).
-4. Reinicie o PautaFlow (`scripts\restart.ps1`).
-
-| Canal | Conteúdo |
-| --- | --- |
-| **#pautas** | pautas criadas, concluídas e com status alterado; novas sugestões do radar com botões **Aprovar / Adiar / Ignorar** |
-| **#painel** | uma mensagem fixada que se atualiza sozinha: indicadores, “Minha atenção hoje”, prioridades e insights |
-| **#geral** | resumos diário/semanal/mensal e alertas (prazos, atrasos, críticas, aprovações, esquecimentos, conflitos de agenda) |
-| **#logs** | conexão do bot, falhas de automações, backups, erros de integração e auditoria de cada ação feita pelo Discord |
-
-Comandos: `/pautas [filtro]`, `/pauta ver | nova | concluir | status | prazo | prioridade | comentar` (com busca por título), `/prioridades`, `/radar`, `/resumo`, `/perguntar`, `/painel`. Os cards de pauta têm botões **Iniciar, Aguardando, Prazo +1 dia, Concluir/Reabrir**. Prazos aceitam linguagem natural (“sexta”, “15/11”, “amanhã”).
-
-> Privacidade: ao ativar o bot, títulos, prazos e resumos das pautas passam a ser enviados ao Discord. O token fica apenas no `.env` local (ignorado pelo Git).
-
 ## Funcionalidades
 
 | Área | O que faz |

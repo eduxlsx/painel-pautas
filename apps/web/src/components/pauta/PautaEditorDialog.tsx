@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { usePauta, usePautas, useCreatePauta, useUpdatePauta } from '@/lib/queries';
 import { useUi } from '@/stores/ui';
 import { toast } from '@/stores/toast';
-import { Button, Dialog, Field, Input, Kbd, NativeSelect, Popover, PopoverContent, PopoverTrigger, Skeleton, Switch, Textarea, STATUS_HEX } from '@/components/ui';
+import { Button, DateInput, DueInput, joinDue, splitDue, Dialog, Field, Input, Kbd, NativeSelect, Popover, PopoverContent, PopoverTrigger, Skeleton, Switch, Textarea, STATUS_HEX } from '@/components/ui';
 import { useLookups } from './PautaCard';
 import { COMPLEXITY_LABEL, IMPACT_LABEL, PriorityOptions, ScalePicker, dateInput, diffInput } from './helpers';
 
@@ -29,6 +29,12 @@ interface Form {
   approvalPending: boolean;
   dependencies: string[];
   tags: string[];
+}
+
+/** Prazo normalizado para o formulário: "YYYY-MM-DD" ou "YYYY-MM-DDTHH:mm" (local). */
+function normDue(due: string | null | undefined): string {
+  const { date, time } = splitDue(due);
+  return joinDue(date, time) ?? '';
 }
 
 const EMPTY: Form = {
@@ -68,7 +74,7 @@ function fromPauta(p: Pauta): Form {
     complexity: p.complexity,
     estimatedHours: p.estimatedHours === null ? '' : String(p.estimatedHours),
     startDate: dateInput(p.startDate),
-    dueDate: dateInput(p.dueDate),
+    dueDate: normDue(p.dueDate),
     approvalPending: p.approvalPending,
     dependencies: [...p.dependencies],
     tags: [...p.tags],
@@ -87,7 +93,7 @@ function fromDefaults(d: Record<string, unknown> | undefined): Form {
   if (d.requester) f.requester = str(d.requester);
   if (d.owner) f.owner = str(d.owner);
   if (d.manualPriority) f.manualPriority = d.manualPriority as PriorityLevel;
-  if (d.dueDate) f.dueDate = dateInput(str(d.dueDate));
+  if (d.dueDate) f.dueDate = normDue(str(d.dueDate));
   if (d.startDate) f.startDate = dateInput(str(d.startDate));
   if (typeof d.impact === 'number') f.impact = d.impact;
   if (typeof d.complexity === 'number') f.complexity = d.complexity;
@@ -169,7 +175,7 @@ export function PautaEditorDialog() {
         const { startDate, dueDate, ...rest } = input;
         const changes = diffInput(existing, rest);
         if (dateInput(existing.startDate) !== form.startDate) changes.startDate = startDate;
-        if (dateInput(existing.dueDate) !== form.dueDate) changes.dueDate = dueDate;
+        if (normDue(existing.dueDate) !== form.dueDate) changes.dueDate = dueDate;
         if (Object.keys(changes).length) {
           await update.mutateAsync({ id: editingId, ...changes });
           toast.success('Pauta atualizada');
@@ -301,10 +307,10 @@ export function PautaEditorDialog() {
                 <Input type="number" min={0} step={0.5} inputMode="decimal" className="tabular" value={form.estimatedHours} onChange={(e) => set('estimatedHours', e.target.value)} placeholder="—" />
               </Field>
               <Field label="Início">
-                <Input type="date" className="tabular dark:[color-scheme:dark]" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} />
+                <DateInput value={form.startDate} onValueChange={(v) => set('startDate', v)} aria-label="Início" />
               </Field>
               <Field label="Prazo" hint={editingId && existing?.sourceRefs.length ? 'Alterar o prazo trava contra sincronizações' : undefined}>
-                <Input type="date" className="tabular dark:[color-scheme:dark]" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} />
+                <DueInput value={form.dueDate} onValueChange={(v) => set('dueDate', v ?? '')} />
               </Field>
             </div>
             <label className="mt-4 flex cursor-pointer items-center justify-between gap-3 rounded-2xl bg-sunken px-4 py-3 ring-1 ring-line">

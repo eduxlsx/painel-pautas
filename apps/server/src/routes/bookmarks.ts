@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { Bookmark, BookmarkInput } from '@pautaflow/shared';
 import type { AppContext } from '../core/context';
+import { onlyProvided } from '../core/patch';
 import { getSyncRoots, openLocalPath, openUrl, pathInfo, pickPaths, webUrlFor } from '../system/windows';
 
 function isUrl(s: string) {
@@ -95,7 +96,7 @@ export function bookmarkRoutes(app: FastifyInstance, ctx: AppContext) {
 
   app.patch('/api/bookmarks/:id', async (req) => {
     const { id } = req.params as { id: string };
-    const input = BookmarkInput.omit({ location: true, kind: true }).parse(req.body);
+    const input = onlyProvided(BookmarkInput.omit({ location: true, kind: true }).parse(req.body), req.body);
     const b = await db.bookmarks.patch(id, (d) => {
       Object.assign(d, input);
       d.updatedAt = new Date().toISOString();

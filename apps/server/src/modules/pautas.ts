@@ -3,6 +3,7 @@ import { Pauta, PautaInput, type SourceKind, type SourceRef, STATUS_LABEL } from
 import type { Database } from '../storage/db';
 import type { EventBus } from '../core/events';
 import { diff, type HistoryService } from '../core/history';
+import { onlyProvided } from '../core/patch';
 import { computePriority, type PriorityContext } from '../intelligence/priority';
 
 type Actor = 'user' | 'system' | 'radar' | 'sync' | 'assistant';
@@ -80,7 +81,7 @@ export class PautaService {
   }
 
   async update(id: string, input: PautaInput, actor: Actor = 'user'): Promise<Pauta> {
-    const data = PautaInput.parse(input);
+    const data = onlyProvided(PautaInput.parse(input), input);
     const before = this.db.pautas.get(id);
     if (!before) throw Object.assign(new Error('Pauta não encontrada'), { statusCode: 404 });
     if (data.dependencies) this.validateDependencies(id, data.dependencies);
