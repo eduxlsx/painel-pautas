@@ -1,0 +1,38 @@
+{
+  "name": "pautaflow-intelligence",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PautaFlow Intelligence — Central autônoma de pautas, demandas e produtividade (local, JSON, Microsoft 365).",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:server": "npm run dev -w @pautaflow/server",
+    "dev:web": "npm run dev -w @pautaflow/web",
+    "build": "npm run build -w @pautaflow/web",
+    "start": "npm run start -w @pautaflow/server",
+    "typecheck": "tsc -p packages/shared && tsc -p apps/server && tsc -p apps/web",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "backup": "tsx scripts/backup.ts",
+    "check": "tsx scripts/check-integrity.ts",
+    "prepare": "node scripts/versioning.mjs install-hooks",
+    "version:show": "node scripts/versioning.mjs show",
+    "version:bump": "node scripts/versioning.mjs bump",
+    "version:set": "node scripts/versioning.mjs set"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

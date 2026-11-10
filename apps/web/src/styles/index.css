@@ -1,0 +1,251 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------ */
+/* Tokens — PautaFlow "Liquid Glass"                                    */
+/* ------------------------------------------------------------------ */
+:root {
+  --pf-canvas: #eef1f8;
+  --pf-surface: rgba(255, 255, 255, 0.58);
+  --pf-surface-strong: rgba(255, 255, 255, 0.78);
+  --pf-surface-solid: #ffffff;
+  --pf-surface-sunken: rgba(15, 23, 42, 0.04);
+  --pf-line: rgba(15, 23, 42, 0.08);
+  --pf-line-strong: rgba(15, 23, 42, 0.14);
+  --pf-rim: rgba(255, 255, 255, 0.75);
+  --pf-highlight: rgba(255, 255, 255, 0.9);
+  --pf-fg: #0b1220;
+  --pf-fg-2: #475569;
+  --pf-fg-3: #8a96a8;
+  --pf-accent: #5b5bf6;
+  --pf-accent-2: #06b6d4;
+  --pf-accent-soft: rgba(91, 91, 246, 0.12);
+  --pf-shadow: 0 1px 0 0 var(--pf-highlight) inset, 0 0 0 1px var(--pf-line), 0 10px 30px -12px rgba(15, 23, 42, 0.18), 0 2px 6px -2px rgba(15, 23, 42, 0.06);
+  --pf-shadow-lg: 0 1px 0 0 var(--pf-highlight) inset, 0 0 0 1px var(--pf-line), 0 30px 60px -20px rgba(15, 23, 42, 0.28), 0 8px 20px -8px rgba(15, 23, 42, 0.1);
+  --pf-blob-1: rgba(129, 140, 248, 0.5);
+  --pf-blob-2: rgba(45, 212, 191, 0.38);
+  --pf-blob-3: rgba(244, 114, 182, 0.28);
+  --pf-blob-4: rgba(251, 191, 36, 0.22);
+  --pf-blur: 22px;
+  color-scheme: light;
+}
+
+.dark {
+  --pf-canvas: #06080f;
+  --pf-surface: rgba(24, 28, 42, 0.52);
+  --pf-surface-strong: rgba(26, 30, 46, 0.78);
+  --pf-surface-solid: #141826;
+  --pf-surface-sunken: rgba(255, 255, 255, 0.04);
+  --pf-line: rgba(255, 255, 255, 0.08);
+  --pf-line-strong: rgba(255, 255, 255, 0.14);
+  --pf-rim: rgba(255, 255, 255, 0.1);
+  --pf-highlight: rgba(255, 255, 255, 0.07);
+  --pf-fg: #eef2fa;
+  --pf-fg-2: #a3adc2;
+  --pf-fg-3: #6b7489;
+  --pf-accent: #8b8cff;
+  --pf-accent-2: #22d3ee;
+  --pf-accent-soft: rgba(139, 140, 255, 0.16);
+  --pf-shadow: 0 1px 0 0 var(--pf-highlight) inset, 0 0 0 1px var(--pf-line), 0 14px 40px -14px rgba(0, 0, 0, 0.65);
+  --pf-shadow-lg: 0 1px 0 0 var(--pf-highlight) inset, 0 0 0 1px var(--pf-line-strong), 0 40px 80px -24px rgba(0, 0, 0, 0.8);
+  --pf-blob-1: rgba(79, 70, 229, 0.38);
+  --pf-blob-2: rgba(13, 148, 136, 0.26);
+  --pf-blob-3: rgba(162, 28, 175, 0.2);
+  --pf-blob-4: rgba(234, 88, 12, 0.1);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+  --color-canvas: var(--pf-canvas);
+  --color-surface: var(--pf-surface);
+  --color-surface-strong: var(--pf-surface-strong);
+  --color-surface-solid: var(--pf-surface-solid);
+  --color-sunken: var(--pf-surface-sunken);
+  --color-line: var(--pf-line);
+  --color-line-strong: var(--pf-line-strong);
+  --color-fg: var(--pf-fg);
+  --color-fg-2: var(--pf-fg-2);
+  --color-fg-3: var(--pf-fg-3);
+  --color-accent: var(--pf-accent);
+  --color-accent-2: var(--pf-accent-2);
+  --color-accent-soft: var(--pf-accent-soft);
+  --color-critical: #ef4444;
+  --color-high: #f97316;
+  --color-medium: #6366f1;
+  --color-low: #64748b;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --radius-glass: 22px;
+  --ease-fluid: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ------------------------------------------------------------------ */
+/* Base                                                                 */
+/* ------------------------------------------------------------------ */
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--pf-canvas);
+  color: var(--pf-fg);
+  font-family: var(--font-sans);
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+::selection {
+  background: color-mix(in srgb, var(--pf-accent) 28%, transparent);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--pf-line-strong) transparent;
+}
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--pf-accent) 70%, transparent);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Fundo "aurora": manchas de cor desfocadas, quase estáticas (barato para a GPU) */
+.pf-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background: var(--pf-canvas);
+}
+.pf-aurora::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 3px 3px;
+  mix-blend-mode: overlay;
+}
+.pf-aurora span {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  will-change: transform;
+  animation: pf-drift 38s var(--ease-fluid) infinite alternate;
+}
+.pf-aurora span:nth-child(1) { width: 52vw; height: 52vw; left: -12vw; top: -18vw; background: var(--pf-blob-1); }
+.pf-aurora span:nth-child(2) { width: 44vw; height: 44vw; right: -14vw; top: 8vh; background: var(--pf-blob-2); animation-duration: 46s; animation-delay: -12s; }
+.pf-aurora span:nth-child(3) { width: 40vw; height: 40vw; left: 26vw; bottom: -22vw; background: var(--pf-blob-3); animation-duration: 52s; animation-delay: -20s; }
+.pf-aurora span:nth-child(4) { width: 26vw; height: 26vw; right: 18vw; bottom: 4vh; background: var(--pf-blob-4); animation-duration: 60s; }
+
+@keyframes pf-drift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(4vw, 3vh, 0) scale(1.08); }
+}
+
+/* ------------------------------------------------------------------ */
+/* Superfícies de vidro                                                 */
+/* ------------------------------------------------------------------ */
+@utility glass {
+  position: relative;
+  background: var(--pf-surface);
+  backdrop-filter: blur(var(--pf-blur)) saturate(170%);
+  -webkit-backdrop-filter: blur(var(--pf-blur)) saturate(170%);
+  box-shadow: var(--pf-shadow);
+  border-radius: var(--radius-glass);
+  isolation: isolate;
+  &::before {
+    /* reflexo especular sutil no topo */
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(180deg, var(--pf-highlight) 0%, transparent 38%);
+    opacity: 0.55;
+    mix-blend-mode: soft-light;
+    z-index: -1;
+  }
+}
+@utility glass-strong {
+  background: var(--pf-surface-strong);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: var(--pf-shadow-lg);
+}
+@utility glass-hover {
+  transition: transform 0.35s var(--ease-fluid), box-shadow 0.35s var(--ease-fluid), background-color 0.25s;
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--pf-shadow-lg);
+  }
+}
+@utility rim {
+  box-shadow: inset 0 0 0 1px var(--pf-rim);
+}
+@utility text-gradient {
+  background: linear-gradient(110deg, var(--pf-accent) 0%, var(--pf-accent-2) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@utility bg-flow {
+  background: linear-gradient(135deg, var(--pf-accent) 0%, var(--pf-accent-2) 100%);
+}
+
+/* Preferência "reduzir transparência" (Configurações) */
+.pf-solid .glass,
+.pf-solid .glass-strong {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: var(--pf-surface-solid) !important;
+}
+.pf-solid .pf-aurora span {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-aurora span {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* Skeleton */
+@keyframes pf-shimmer {
+  100% { transform: translateX(100%); }
+}
+.pf-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--pf-surface-sunken);
+  border-radius: 12px;
+}
+.pf-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--pf-highlight), transparent);
+  animation: pf-shimmer 1.4s infinite;
+}
+
+/* Impressão de relatórios (Salvar como PDF) */
+@media print {
+  body { overflow: visible; background: #fff; }
+  .pf-aurora, .pf-no-print { display: none !important; }
+  .glass, .glass-strong { backdrop-filter: none !important; background: #fff !important; box-shadow: none !important; border: 1px solid #e2e8f0; }
+  .pf-print-full { position: static !important; overflow: visible !important; height: auto !important; padding: 0 !important; }
+}

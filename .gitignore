@@ -1,0 +1,12 @@
+node_modules/
+dist/
+data/
+backups/
+logs/
+.env
+*.tmp-*
+test-results/
+playwright-report/
+.vite/
+coverage/
+PautaFlow.exe

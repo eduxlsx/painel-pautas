@@ -1,0 +1,5 @@
+#!/bin/sh
+# PautaFlow — versionamento automático após cada commit.
+# Classifica a mensagem (feat/fix/style ou [feature]/[fix]/[visual]) e emenda a nova versão no commit.
+[ "$PAUTAFLOW_VERSIONING" = "1" ] && exit 0
+node "$(git rev-parse --show-toplevel)/scripts/versioning.mjs" auto || true
