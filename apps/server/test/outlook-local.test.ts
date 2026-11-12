@@ -62,6 +62,23 @@ describe('Radar — notificações do Planner por e-mail', () => {
     expect(c.confidence).toBe(0.8);
     expect(c.signals[0]).toMatch(/Planner/);
   });
+  it('atribuição enviada "em nome de" uma pessoa (formato atual do Planner)', () => {
+    const c = analyzeMail(
+      mail({
+        fromName: 'Natanael Ferreira',
+        fromEmail: 'natanael@empresa.com',
+        subject: 'Uma tarefa foi atribuída a você',
+        bodyText:
+          'Natanael atribuiu uma tarefa a você\n Plano: Comunicação Corporativa \n Natanael atribuiu a você uma tarefa no Comunicação Corporativa <https://planner.cloud.microsoft/x/pt-BR/Home/PlanViews/PLANO?Type=AssignedTo>\nTV Corporativa - Acelera <https://planner.cloud.microsoft/x/Home/PlanViews/PLANO/TAREFA1?Type=AssignedTo>\n Sem data de vencimento',
+      }),
+      ctx,
+    )!;
+    expect(c.title).toBe('TV Corporativa - Acelera');
+    expect(c.signals).toContain('Plano: Comunicação Corporativa');
+    expect(c.requester).toBe('Natanael');
+    expect(c.dueDate).toBeNull();
+  });
+
   it('outras notificações do Planner são ignoradas', () => {
     expect(analyzeMail(mail({ subject: 'Novo comentário na tarefa', bodyText: 'João comentou na tarefa.' }), ctx)).toBeNull();
     expect(analyzeMail(mail({ subject: 'Você tem tarefas atrasadas', bodyText: 'Tarefas atribuídas a você no plano Comunicação estão atrasadas.' }), ctx)).toBeNull();

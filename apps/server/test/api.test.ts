@@ -258,6 +258,50 @@ describe('visões, resumos e analytics', () => {
   });
 });
 
+describe('Claude — ferramentas locais (sem chamar a API)', () => {
+  const run = (name: string, input: unknown, actions: unknown[] = [], allow = true) =>
+    (ctx.claude as unknown as { runTool(n: string, i: unknown, a: unknown[], allow: boolean): Promise<string> }).runTool(name, input, actions, allow);
+
+  it('fica inativo sem chave e sem autorização', async () => {
+    const s = (await get('/api/claude/status')).json();
+    expect(s.ready).toBe(false);
+    expect((await post('/api/claude/chat', { message: 'oi' })).statusCode).toBe(400);
+    expect((await post('/api/claude/key', { apiKey: 'chave-errada' })).statusCode).toBe(400);
+  });
+
+  it('cria, atualiza e consulta pautas pelas ferramentas', async () => {
+    await post('/api/projetos', { name: 'Feira Agro' });
+    const actions: { summary: string; pautaId: string | null }[] = [];
+    const created = JSON.parse(await run('criar_pauta', { titulo: 'Release da feira', prazo: '2026-11-20T14:00', prioridade: 'high', projeto: 'feira agro', solicitante: 'Ana' }, actions));
+    expect(created.pauta.prazo).toBe('20/11/2026 às 14:00');
+    expect(created.pauta.projeto).toBe('Feira Agro');
+    const updated = JSON.parse(await run('atualizar_pauta', { id: created.pauta.id, responsavel: 'Eduardo', comentario: 'Revisar com a Ana' }, actions));
+    expect(updated.pauta.responsavel).toBe('Eduardo');
+    expect(updated.pauta.solicitante).toBe('Ana'); // atualização parcial preserva os demais campos
+    expect(updated.pauta.prazo).toBe('20/11/2026 às 14:00');
+    expect(actions).toHaveLength(2);
+    const list = JSON.parse(await run('listar_pautas', { busca: 'release da feira' }));
+    expect(list.pautas[0].titulo).toBe('Release da feira');
+    const det = JSON.parse(await run('ver_pauta', { id: created.pauta.id }));
+    expect(det.comentarios[0]).toContain('Revisar com a Ana');
+  });
+
+  it('recusa ações quando desativadas, projeto inexistente e prazo inválido', async () => {
+    await expect(run('criar_pauta', { titulo: 'X' }, [], false)).rejects.toThrow(/Ações desativadas/);
+    await expect(run('criar_pauta', { titulo: 'X', projeto: 'Inexistente' })).rejects.toThrow(/não existe/);
+    await expect(run('criar_pauta', { titulo: 'X', prazo: '31/02' })).rejects.toThrow(/Prazo inválido/);
+  });
+
+  it('agenda e e-mails sincronizados', async () => {
+    const emails = JSON.parse(await run('buscar_emails', { busca: 'fenasucro', dias: 3 }));
+    expect(emails.total).toBeGreaterThan(0);
+    const full = JSON.parse(await run('ler_email', { id: emails.emails[0].id }));
+    expect(full.corpo).toContain('release');
+    const agenda = JSON.parse(await run('agenda', {}));
+    expect(agenda.some((i: { tipo: string }) => i.tipo === 'reunião')).toBe(true);
+  });
+});
+
 describe('automações, backups e arquivos', () => {
   it('lista automações com próximo horário', async () => {
     const list = (await get('/api/automations')).json();

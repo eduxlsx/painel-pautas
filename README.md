@@ -77,6 +77,16 @@ Se você não puder registrar o aplicativo (página do Entra bloqueada), ative *
 - Quando o Microsoft 365 for conectado, ele passa a ser a fonte e o Outlook local fica em espera automaticamente.
 - A primeira leitura cobre o período de busca (14 dias) e pode levar alguns minutos; as seguintes são incrementais. Nas sugestões, “Abrir no Outlook” abre o e-mail no Outlook do computador.
 
+## Assistente Claude (opcional)
+
+Em **Integrações → Claude (Anthropic)**: cole a chave da API (criada em console.anthropic.com, cobrança na conta da Anthropic; fica cifrada com DPAPI), autorize o envio dos dados consultados e salve. No painel do assistente (ícone ✦ no topo), escolha **Claude** e peça em linguagem natural, por exemplo:
+
+- "O que tenho para hoje, entre reuniões e entregas?"
+- "Crie uma pauta *Revisar release da feira* para sexta às 14h, prioridade alta, no projeto Feira."
+- "Resuma os e-mails das últimas 24h que pedem ação." · "Aprove a sugestão do radar sobre o Quiz."
+
+O Claude consulta pautas, e-mails sincronizados, agenda, sugestões e resumos, e — se "Permitir ações" estiver ligado — cria/atualiza pautas e decide sugestões. Ele **não exclui** nada nem envia e-mails. Modelo padrão: Claude Opus 5.5 (Sonnet 5.5 e Haiku 5.5 disponíveis). Sem chave/autorização, o assistente continua funcionando no modo **Local** (motor de regras).
+
 ## Inteligência artificial (opcional)
 
 O sistema funciona integralmente sem IA. Em *Integrações → Inteligência*:

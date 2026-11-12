@@ -1,6 +1,6 @@
 {
   "name": "@pautaflow/server",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,6 +8,7 @@
     "start": "tsx src/index.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
     "@azure/msal-node": "^7.2.1",
     "@fastify/static": "^10.1.10",
     "@pautaflow/shared": "*",

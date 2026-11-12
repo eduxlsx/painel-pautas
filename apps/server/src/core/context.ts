@@ -15,6 +15,7 @@ import { MicrosoftService } from '../integrations/microsoft/service';
 import { Scheduler } from '../automation/scheduler';
 import { VersionService } from './version';
 import { OutlookLocalService } from '../integrations/outlook-local/service';
+import { ClaudeAssistant } from '../intelligence/claude';
 
 export interface AppContext {
   env: Env;
@@ -33,6 +34,7 @@ export interface AppContext {
   scheduler: Scheduler;
   version: VersionService;
   outlookLocal: OutlookLocalService;
+  claude: ClaudeAssistant;
   startedAt: Date;
 }
 
@@ -86,6 +88,7 @@ export async function createContext(env: Env, log: Logger, opts: ContextOptions 
   ctx.radar = new RadarService(ctx);
   ctx.summaries = new SummaryService(ctx);
   ctx.outlookLocal = new OutlookLocalService(ctx);
+  ctx.claude = new ClaudeAssistant(ctx);
   ctx.ms = new MicrosoftService(ctx, { fetchImpl: opts.fetchImpl, sandbox: opts.sandbox, tokenProvider: opts.msTokenProvider });
   ctx.scheduler = new Scheduler(ctx);
   return ctx;

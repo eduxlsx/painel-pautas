@@ -222,6 +222,56 @@ export class RadarService {
     return enriched;
   }
 
+  /** Proposta manual (revisão assistida): entra no Radar como sugestão pendente, nunca como pauta direta. */
+  async propose(p: {
+    title: string;
+    description?: string;
+    dueDate?: string | null;
+    priority?: Sugestao['suggestedPriority'];
+    kind?: Sugestao['kind'];
+    requester?: string | null;
+    evidence?: string;
+    justification?: string;
+    emailIds?: string[];
+    analyzedBy?: string;
+  }): Promise<Sugestao> {
+    const { db } = this.app;
+    const now = new Date().toISOString();
+    const refs = (p.emailIds ?? [])
+      .map((id) => db.mensagens.get(id) ?? db.mensagens.find((m) => m.id.endsWith(id)))
+      .filter((m): m is NonNullable<typeof m> => !!m)
+      .map((m) => ({ source: 'outlook' as const, externalId: m.id, url: m.webLink, title: m.subject, conversationId: m.conversationId, linkedAt: now, snapshot: {} }));
+    const ctx = this.context();
+    const text = `${p.title} ${p.description ?? ''}`;
+    const s = Sugestao.parse({
+      id: randomUUID(),
+      title: p.title,
+      description: p.description ?? '',
+      source: refs.length ? 'outlook' : 'assistant',
+      sourceRefs: refs,
+      sourceUrl: refs[0]?.url ?? null,
+      requester: p.requester ?? null,
+      dueDate: p.dueDate ?? null,
+      dueDateEvidence: p.dueDate ? 'Indicado na revisão dos e-mails' : null,
+      suggestedPriority: p.priority ?? 'medium',
+      kind: p.kind ?? 'tarefa',
+      approvalPending: p.kind === 'aprovacao',
+      categoryId: ctx.categories.find((c) => [c.name, ...c.keywords].some((k) => k.length > 3 && text.toLowerCase().includes(k.toLowerCase())))?.id ?? null,
+      justification: p.justification ?? '',
+      evidence: p.evidence ?? '',
+      signals: ['Proposta da revisão de e-mails e Planner'],
+      confidence: 0.85,
+      analyzedBy: p.analyzedBy ?? 'revisão assistida',
+      receivedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.sugestoes.insert(s);
+    await this.app.history.record({ entity: 'sugestao', entityId: s.id, action: 'suggested', summary: `Proposta da revisão: ${s.title}`, actor: 'assistant' });
+    this.app.bus.changed('sugestoes');
+    return s;
+  }
+
   /* ------------------------- Ações do usuário ------------------------- */
 
   private get(id: string): Sugestao {
@@ -340,6 +390,7 @@ export class RadarService {
           justification: cand.justification,
           dueDate: d.dueDate ?? cand.dueDate,
           categoryId: d.categoryId ?? cand.categoryId,
+          requester: d.requester ?? cand.requester,
           projectId: d.projectId ?? cand.projectId,
           updatedAt: new Date().toISOString(),
         });

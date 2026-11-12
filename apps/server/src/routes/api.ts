@@ -229,6 +229,23 @@ export function registerApi(app: FastifyInstance, ctx: AppContext) {
     return { started: true };
   });
   app.post('/api/radar/reanalyze', async () => radar.reanalyze());
+  app.post('/api/sugestoes', async (req) => {
+    const b = z
+      .object({
+        title: z.string().min(1).max(200),
+        description: z.string().max(4000).optional(),
+        dueDate: z.string().nullable().optional(),
+        priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+        kind: z.enum(['tarefa', 'entrega', 'publicacao', 'reuniao', 'aprovacao']).optional(),
+        requester: z.string().nullable().optional(),
+        evidence: z.string().max(1500).optional(),
+        justification: z.string().max(1500).optional(),
+        emailIds: z.array(z.string()).max(20).optional(),
+        analyzedBy: z.string().max(60).optional(),
+      })
+      .parse(req.body);
+    return radar.propose(b);
+  });
   app.get('/api/sugestoes', async (req) => {
     const { status } = req.query as { status?: string };
     return db.sugestoes
@@ -371,6 +388,27 @@ export function registerApi(app: FastifyInstance, ctx: AppContext) {
   });
   app.get('/api/integrations/microsoft/folders', async () => ms.listMailFolders());
   app.get('/api/integrations/microsoft/plans', async () => ms.listPlans());
+
+  /* Claude (API da Anthropic) */
+  app.get('/api/claude/status', async () => ctx.claude.status());
+  app.post('/api/claude/key', async (req) => {
+    const { apiKey } = z.object({ apiKey: z.string().nullable() }).parse(req.body);
+    const v = apiKey?.trim() || null;
+    if (v && !/^sk-ant-[\w-]{20,}$/.test(v)) throw Object.assign(new Error('Formato de chave inválido (esperado sk-ant-…)'), { statusCode: 400 });
+    await ctx.secrets.set('anthropicApiKey', v);
+    await history.record({ entity: 'integracao', entityId: 'claude', action: v ? 'key_set' : 'key_removed', summary: v ? 'Chave da API da Anthropic salva (cifrada com DPAPI)' : 'Chave da API da Anthropic removida', actor: 'user' });
+    return ctx.claude.status();
+  });
+  app.post('/api/claude/test', async () => ctx.claude.test());
+  app.post('/api/claude/chat', async (req) => {
+    const b = z.object({ message: z.string().min(1).max(4000), conversationId: z.string().nullable().optional() }).parse(req.body);
+    return ctx.claude.chat(b.conversationId ?? null, b.message);
+  });
+  app.post('/api/claude/reset', async (req) => {
+    const { conversationId } = z.object({ conversationId: z.string() }).parse(req.body);
+    ctx.claude.reset(conversationId);
+    return { ok: true };
+  });
 
   /* Outlook deste computador (automação COM do Outlook clássico) */
   app.get('/api/integrations/outlook-local', async () => ctx.outlookLocal.status());

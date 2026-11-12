@@ -1,12 +1,42 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowUp, Bot, Cpu, Eraser, FolderKanban, ListTodo, Radar, Sparkles, TriangleAlert, X } from 'lucide-react';
+import { ArrowUp, Bot, CheckCircle2, Cpu, Eraser, FolderKanban, ListTodo, Radar, Sparkles, TriangleAlert, X } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import type { AssistantAnswer } from '@pautaflow/shared';
-import { useAsk } from '@/lib/queries';
+import { api, post, useAsk } from '@/lib/queries';
+import { queryClient } from '@/lib/api';
 import { cn, uid } from '@/lib/utils';
 import { useUi } from '@/stores/ui';
-import { Button, Kbd, Tip } from '@/components/ui';
+import { Button, Kbd, Segmented, Tip } from '@/components/ui';
+
+interface ClaudeAction {
+  tool: string;
+  summary: string;
+  pautaId: string | null;
+}
+interface ClaudeReply {
+  conversationId: string;
+  answer: string;
+  actions: ClaudeAction[];
+  model: string;
+}
+interface ClaudeStatus {
+  hasKey: boolean;
+  allowData: boolean;
+  model: string;
+  ready: boolean;
+  detail: string;
+}
+
+const CLAUDE_SUGGESTIONS = [
+  'O que tenho para hoje, entre reuniões e entregas?',
+  'Resuma os e-mails das últimas 24h que pedem ação.',
+  'Crie uma pauta "Revisar release da feira" para sexta às 14h, prioridade alta.',
+  'Quais sugestões do radar valem a pena aprovar?',
+  'Quais pautas estão sem prazo e deveriam ter um?',
+];
 
 const SUGGESTIONS = [
   'Quais são minhas prioridades hoje?',
@@ -21,7 +51,7 @@ const SUGGESTIONS = [
 
 type Msg =
   | { id: string; role: 'user'; text: string }
-  | { id: string; role: 'assistant'; text: string; items: AssistantAnswer['items']; source: string }
+  | { id: string; role: 'assistant'; text: string; items: AssistantAnswer['items']; source: string; actions?: ClaudeAction[] }
   | { id: string; role: 'error'; text: string; question: string };
 
 const ITEM_ICON: Record<AssistantAnswer['items'][number]['type'], ReactNode> = {
@@ -31,6 +61,7 @@ const ITEM_ICON: Record<AssistantAnswer['items'][number]['type'], ReactNode> = {
 };
 
 function sourceLabel(source: string) {
+  if (source.startsWith('claude-')) return `Claude ${source.replace('claude-', '').replace(/-(\d)-(\d)$/, ' $1.$2').replace(/^\w/, (c) => c.toUpperCase())}`;
   return source === 'rules' ? 'Motor de regras (dados locais)' : `IA: ${source}`;
 }
 
@@ -72,6 +103,13 @@ export function AssistantPanel() {
   const { assistantOpen: open, setAssistant, openPauta } = useUi();
   const navigate = useNavigate();
   const ask = useAsk();
+  const claudeStatus = useQuery({ queryKey: ['claude-status'], queryFn: ({ signal }) => api<ClaudeStatus>('/api/claude/status', { signal }), enabled: open, staleTime: 30_000 });
+  const claudeReady = !!claudeStatus.data?.ready;
+  const [mode, setMode] = useState<'claude' | 'local' | null>(null);
+  const effMode = mode ?? (claudeReady ? 'claude' : 'local');
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const claude = useMutation<ClaudeReply, Error, string>({ mutationFn: (message) => post<ClaudeReply>('/api/claude/chat', { message, conversationId }) });
+  const pending = ask.isPending || claude.isPending;
   const [messages, setMessages] = useState<Msg[]>([]);
   const [draft, setDraft] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -93,7 +131,7 @@ export function AssistantPanel() {
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }, [messages, ask.isPending]);
+  }, [messages, pending]);
 
   useEffect(() => {
     const el = inputRef.current;
@@ -104,9 +142,21 @@ export function AssistantPanel() {
 
   const send = (text: string) => {
     const question = text.trim();
-    if (!question || ask.isPending) return;
+    if (!question || pending) return;
     setMessages((m) => [...m, { id: uid(), role: 'user', text: question }]);
     setDraft('');
+    if (effMode === 'claude') {
+      claude.mutate(question, {
+        onSuccess: (r) => {
+          setConversationId(r.conversationId);
+          const items = r.actions.filter((a) => a.pautaId).map((a) => ({ type: 'pauta' as const, id: a.pautaId!, title: a.summary }));
+          setMessages((m) => [...m, { id: uid(), role: 'assistant', text: r.answer, items, source: r.model, actions: r.actions }]);
+          if (r.actions.length) void queryClient.invalidateQueries();
+        },
+        onError: (err) => setMessages((m) => [...m, { id: uid(), role: 'error', text: err.message || 'Não foi possível falar com o Claude.', question }]),
+      });
+      return;
+    }
     ask.mutate(question, {
       onSuccess: (r) => setMessages((m) => [...m, { id: uid(), role: 'assistant', text: r.answer, items: r.items, source: r.source }]),
       onError: (err) => setMessages((m) => [...m, { id: uid(), role: 'error', text: err.message || 'Não foi possível obter uma resposta.', question }]),
@@ -147,11 +197,26 @@ export function AssistantPanel() {
             </span>
             <div className="relative min-w-0 flex-1">
               <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-fg">Assistente</h2>
-              <p className="truncate text-xs text-fg-3">Pergunte sobre suas pautas, prazos e projetos</p>
+              <p className="truncate text-xs text-fg-3">{effMode === 'claude' ? 'Peça consultas e ações nas suas pautas' : 'Respostas locais sobre pautas e prazos'}</p>
             </div>
+            <Segmented
+              id="assistant-mode"
+              size="sm"
+              value={effMode}
+              onChange={(v) => setMode(v)}
+              options={[
+                { value: 'claude', label: 'Claude' },
+                { value: 'local', label: 'Local' },
+              ]}
+            />
             {!empty && (
               <Tip content="Limpar conversa">
-                <Button size="icon-sm" variant="ghost" onClick={() => setMessages([])} aria-label="Limpar conversa" disabled={ask.isPending}>
+                <Button size="icon-sm" variant="ghost" onClick={() => {
+                    setMessages([]);
+                    if (conversationId) void post('/api/claude/reset', { conversationId }).catch(() => undefined);
+                    setConversationId(null);
+                  }}
+                  aria-label="Limpar conversa" disabled={pending}>
                   <Eraser />
                 </Button>
               </Tip>
@@ -170,12 +235,33 @@ export function AssistantPanel() {
                     <Bot />
                   </span>
                   <div className="text-[13.5px] leading-relaxed text-fg-2">
-                    <p className="font-medium text-fg">Olá! Eu consulto seus dados locais do PautaFlow.</p>
-                    <p className="mt-1">Posso listar prioridades, prazos em risco, aprovações pendentes, novidades do radar e resumir seu período. Clique em uma sugestão ou escreva sua pergunta.</p>
+                    {effMode === 'claude' ? (
+                      claudeReady ? (
+                        <>
+                          <p className="font-medium text-fg">Olá! Sou o Claude, integrado ao seu PautaFlow.</p>
+                          <p className="mt-1">Consulto pautas, e-mails sincronizados, agenda e o radar, e posso criar ou atualizar pautas e decidir sugestões. Não excluo nada nem envio e-mails.</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-medium text-fg">O Claude ainda não está configurado.</p>
+                          <p className="mt-1">
+                            {claudeStatus.data?.detail ?? 'Verificando…'}{' '}
+                            <Link to="/integracoes" onClick={() => setAssistant(false)} className="font-medium text-accent hover:underline">
+                              Abrir Integrações
+                            </Link>
+                          </p>
+                        </>
+                      )
+                    ) : (
+                      <>
+                        <p className="font-medium text-fg">Olá! Eu consulto seus dados locais do PautaFlow.</p>
+                        <p className="mt-1">Posso listar prioridades, prazos em risco, aprovações pendentes, novidades do radar e resumir seu período. Clique em uma sugestão ou escreva sua pergunta.</p>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {SUGGESTIONS.map((s, i) => (
+                  {(effMode === 'claude' ? CLAUDE_SUGGESTIONS : SUGGESTIONS).map((s, i) => (
                     <motion.button
                       key={s}
                       initial={{ opacity: 0, y: 6 }}
@@ -204,7 +290,7 @@ export function AssistantPanel() {
                         </span>
                         <div className="rounded-[20px] rounded-tl-md bg-critical/8 px-3.5 py-2.5 text-[13px] text-fg-2 ring-1 ring-inset ring-critical/20">
                           <p>{m.text}</p>
-                          <button onClick={() => send(m.question)} className="mt-1.5 text-xs font-semibold text-accent hover:underline" disabled={ask.isPending}>
+                          <button onClick={() => send(m.question)} className="mt-1.5 text-xs font-semibold text-accent hover:underline" disabled={pending}>
                             Tentar novamente
                           </button>
                         </div>
@@ -218,6 +304,16 @@ export function AssistantPanel() {
                           <div className="rounded-[20px] rounded-tl-md bg-surface px-3.5 py-2.5 text-[13.5px] leading-relaxed text-fg shadow-[var(--pf-shadow)]">
                             <AnswerText text={m.text} />
                           </div>
+                          {m.actions && m.actions.length > 0 && (
+                            <ul className="mt-2 space-y-1 rounded-2xl bg-success/8 px-3 py-2 ring-1 ring-inset ring-success/20">
+                              {m.actions.map((a, i) => (
+                                <li key={i} className="flex items-start gap-1.5 text-[12px] text-fg-2">
+                                  <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
+                                  <span>{a.summary}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                           {m.items.length > 0 && (
                             <div className="mt-2 flex flex-wrap gap-1.5">
                               {m.items.map((it) => (
@@ -244,7 +340,7 @@ export function AssistantPanel() {
                   </motion.div>
                 ))}
                 <AnimatePresence>
-                  {ask.isPending && (
+                  {pending && (
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex items-center gap-2.5">
                       <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent [&_svg]:size-3.5">
                         <Bot />
@@ -270,11 +366,11 @@ export function AssistantPanel() {
           <div className="shrink-0 border-t border-line p-3">
             {!empty && (
               <div className="-mx-1 mb-2 flex gap-1.5 overflow-x-auto px-1 pb-1">
-                {SUGGESTIONS.slice(0, 5).map((s) => (
+                {(effMode === 'claude' ? CLAUDE_SUGGESTIONS : SUGGESTIONS).slice(0, 5).map((s) => (
                   <Fragment key={s}>
                     <button
                       onClick={() => send(s)}
-                      disabled={ask.isPending}
+                      disabled={pending}
                       className="shrink-0 rounded-full bg-sunken px-2.5 py-1 text-[11.5px] font-medium text-fg-2 ring-1 ring-line transition hover:text-accent disabled:opacity-50"
                     >
                       {s}
@@ -301,16 +397,16 @@ export function AssistantPanel() {
                     send(draft);
                   }
                 }}
-                placeholder="Pergunte algo…"
+                placeholder={effMode === 'claude' ? 'Peça algo ao Claude…' : 'Pergunte algo…'}
                 maxLength={1000}
                 className="max-h-[140px] min-h-[36px] flex-1 resize-none bg-transparent py-2 text-[13.5px] leading-relaxed text-fg placeholder:text-fg-3 focus:outline-none"
               />
               <button
                 type="submit"
-                disabled={!draft.trim() || ask.isPending}
+                disabled={!draft.trim() || pending || (effMode === 'claude' && !claudeReady)}
                 className={cn(
                   'grid size-9 shrink-0 place-items-center rounded-full transition-all [&_svg]:size-4',
-                  draft.trim() && !ask.isPending ? 'bg-flow text-white shadow-[0_6px_16px_-6px_var(--pf-accent)] hover:brightness-110' : 'bg-line text-fg-3',
+                  draft.trim() && !pending ? 'bg-flow text-white shadow-[0_6px_16px_-6px_var(--pf-accent)] hover:brightness-110' : 'bg-line text-fg-3',
                 )}
                 aria-label="Enviar"
               >

@@ -75,13 +75,18 @@ export function analyzePlannerEmail(msg: MailMessage, ctx: RadarContext): Demand
   if (!PLANNER_ASSIGN.test(norm(text))) return null; // comentários e outros avisos do Planner
   // Resumos ("Você tem tarefas atrasadas", "tarefas vencendo") não identificam uma tarefa única
   if (/(tarefas? (atrasad|vencend|vence)|voce tem \d* ?tarefas|late tasks|tasks? (due|overdue)|you have \d* ?tasks)/.test(norm(msg.subject))) return null;
+  // Formato atual do Planner: o nome da tarefa é a linha com o link da tarefa (…/PlanViews/<plano>/<tarefa>)
+  const taskLine = /^\s*([^\n<]{2,160}?)\s*<https:\/\/(?:planner\.cloud\.microsoft|tasks\.office\.com)\/[^>\s]*\/PlanViews\/[^/>\s]+\/[^?>\s]+/m.exec(body);
   const quoted = /["“”«]([^"“”»\n]{3,160})["“”»]/.exec(msg.subject) ?? /["“”«]([^"“”»\n]{3,160})["“”»]/.exec(body);
   const afterColon = /(?:tarefa|task)\s*:\s*(.{3,160})$/im.exec(msg.subject);
-  const title = (quoted?.[1] ?? afterColon?.[1] ?? cleanSubject(msg.subject)).trim();
-  const plan = /(?:no plano|in (?:the )?plan|plano)\s*[:"“]?\s*([^\n"”]{2,80})/i.exec(body)?.[1]?.trim() ?? null;
+  const title = (taskLine?.[1] ?? quoted?.[1] ?? afterColon?.[1] ?? cleanSubject(msg.subject)).trim();
+  const plan = /^\s*(?:plano|plan)\s*:\s*([^\n<]{2,80})/im.exec(body)?.[1]?.trim() ?? /(?:no plano|in (?:the )?plan)\s*[:"“]?\s*([^\n"”<]{2,80})/i.exec(body)?.[1]?.trim() ?? null;
   const dueLine = /(?:data de conclus[aã]o|conclus[aã]o|vencimento|due(?: date)?)\s*:?\s*([^\n]{4,40})/i.exec(body)?.[1] ?? null;
   const deadline = dueLine ? extractDeadline(`até ${dueLine}`, new Date(msg.receivedAt)) : extractDeadline(body, new Date(msg.receivedAt));
-  const assigner = /^(.{2,60}?)\s+(atribuiu|assigned|designou)/i.exec(msg.subject)?.[1]?.trim() ?? null;
+  const assigner =
+    /^(.{2,60}?)\s+(atribuiu|assigned|designou)/i.exec(msg.subject)?.[1]?.trim() ??
+    /^\s*([^\n]{2,60}?)\s+(atribuiu|assigned|designou)/im.exec(body)?.[1]?.trim() ??
+    (msg.fromName && !/planner|microsoft/i.test(msg.fromName) ? msg.fromName : null);
   const project = plan ? ctx.projects.find((p) => norm(p.name) === norm(plan)) ?? guessByKeywords(plan, ctx.projects) : guessByKeywords(text, ctx.projects.filter((p) => p.status === 'active'));
   const category = guessByKeywords(text, ctx.categories);
   const signals = ['Atribuição de tarefa no Planner (notificação por e-mail)'];
@@ -120,7 +125,10 @@ export function analyzePlannerEmail(msg: MailMessage, ctx: RadarContext): Demand
 export function analyzeMail(msg: MailMessage, ctx: RadarContext): DemandCandidate | null {
   const sender = (msg.fromEmail ?? '').toLowerCase();
   if (msg.meetingMessageType && msg.meetingMessageType !== 'none') return null;
-  if (!msg.isSent && (PLANNER_SENDER.test(sender) || (/planner/i.test(msg.fromName ?? '') && NOISE_SENDER.test(sender)))) return analyzePlannerEmail(msg, ctx);
+  // Notificações do Planner: do remetente noreply@planner… ou enviadas "em nome de" quem atribuiu (link planner.cloud.microsoft no corpo)
+  const plannerLink = /https:\/\/(planner\.cloud\.microsoft|tasks\.office\.com)\//i.test(msg.bodyText || msg.bodyPreview);
+  if (!msg.isSent && (PLANNER_SENDER.test(sender) || (/planner/i.test(msg.fromName ?? '') && NOISE_SENDER.test(sender)) || (plannerLink && PLANNER_ASSIGN.test(norm(`${msg.subject} ${msg.bodyPreview}`)))))
+    return analyzePlannerEmail(msg, ctx);
   if (!msg.isSent && ctx.ignoreSenders.some((s) => s && sender.includes(s.toLowerCase()))) return null;
   if (!msg.isSent && NOISE_SENDER.test(sender)) return null;
 

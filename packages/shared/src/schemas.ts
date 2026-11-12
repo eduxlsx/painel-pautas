@@ -391,6 +391,17 @@ export const Configuracoes = z.object({
       maxPerFolder: z.number().int().min(50).max(2000).default(400),
     })
     .prefault({}),
+  /** Assistente Claude (API da Anthropic): conversa e executa ações nas pautas. */
+  claude: z
+    .object({
+      /** Autorização explícita: o conteúdo das pautas/e-mails consultados é enviado à Anthropic. */
+      allowData: z.boolean().default(false),
+      model: z.enum(['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']).default('claude-opus-5-5'),
+      effort: z.enum(['low', 'medium', 'high']).default('medium'),
+      /** Permite que o Claude crie/altere pautas e decida sugestões (sem isso, só consulta). */
+      allowActions: z.boolean().default(true),
+    })
+    .prefault({}),
   ai: z
     .object({
       provider: AiProviderKind.default('none'),

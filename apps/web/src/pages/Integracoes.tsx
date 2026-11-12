@@ -9,6 +9,7 @@ import { MicrosoftConnectPanel, MsStateChip, msState, useMicrosoftLive } from '@
 import { MicrosoftSources } from '@/components/settings/MicrosoftSources';
 import { AiSettingsPanel } from '@/components/settings/AiSettings';
 import { OutlookLocalCard } from '@/components/settings/OutlookLocalCard';
+import { ClaudeCard } from '@/components/settings/ClaudeCard';
 import { Note, RowGroup, SectionCard, SettingRow, useDraft } from '@/components/settings/shared';
 
 function MicrosoftIcon() {
@@ -62,6 +63,10 @@ export default function Integracoes() {
             </SectionCard>
           </motion.div>
         )}
+
+        <motion.div variants={item}>
+          <ClaudeCard />
+        </motion.div>
 
         <div className="grid gap-5 xl:grid-cols-[1.6fr_1fr]">
           <motion.div variants={item}>
